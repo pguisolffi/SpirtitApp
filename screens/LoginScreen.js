@@ -23,7 +23,7 @@ export default function LoginScreen() {
       <Input placeholder="Senha" secureTextEntry />
 
       <View style={styles.buttonContainer}>
-        <Button title="Entrar" onPress={() => router.push('/home')} />
+        <Button title="Entrar" onPress={() => router.push('/Rota_HomeFuncionario')} />
       </View>
 
       <TouchableOpacity onPress={() => router.push('/cadastro')}>
