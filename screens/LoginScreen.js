@@ -1,10 +1,14 @@
+// screens/LoginScreen.js
 import React from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import Input from '../components/input';
+import { useRouter } from 'expo-router';  
 
 const { width, height } = Dimensions.get('window');
 
-export default function LoginScreen({ navigation, onLoginSuccess }) {
+export default function LoginScreen() {
+  const router = useRouter();
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Fraternidade Bezerra de Menezes</Text>
@@ -19,10 +23,10 @@ export default function LoginScreen({ navigation, onLoginSuccess }) {
       <Input placeholder="Senha" secureTextEntry />
 
       <View style={styles.buttonContainer}>
-        <Button title="Entrar" onPress={onLoginSuccess} />
+        <Button title="Entrar" onPress={() => router.push('/home')} />
       </View>
 
-      <TouchableOpacity onPress={() => navigation.navigate('Cadastro')}>
+      <TouchableOpacity onPress={() => router.push('/cadastro')}>
         <Text style={styles.register}>Cadastre-se</Text>
       </TouchableOpacity>
 

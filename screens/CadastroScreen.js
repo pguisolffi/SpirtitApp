@@ -9,10 +9,14 @@ import {
   ScrollView,
 } from 'react-native';
 import Input from '../components/input';
+import { useRouter } from 'expo-router'; 
 
 const { width, height } = Dimensions.get('window');
 
 export default function CadastroScreen({ navigation }) {
+
+  const router = useRouter();
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Cadastro</Text>
@@ -27,8 +31,8 @@ export default function CadastroScreen({ navigation }) {
         <Button title="Cadastrar" onPress={() => alert('Cadastro enviado!')} />
       </View>
 
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.loginLink}>Já tem conta? Voltar ao Login</Text>
+      <TouchableOpacity onPress={() => router.push('/login')}>
+        <Text style={styles.loginLink}>Já tem conta? Voltar ao Login </Text>
       </TouchableOpacity>
     </ScrollView>
   );
