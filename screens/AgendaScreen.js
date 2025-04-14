@@ -27,9 +27,9 @@ export default function Agenda() {
   const [eventoSelecionado, setEventoSelecionado] = useState(null);
   const [modalAberta, setModalAberta] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [participacoes, setParticipacoes] = useState({});
 
-  const usuarioAutorizado = true; // aqui você define a regra depois
-
+  const usuarioAutorizado = true; // define a regra depois
   const dataChave = format(dataSelecionada, "yyyy-MM-dd");
   const eventosDoDia = eventos[dataChave] || [];
 
@@ -69,6 +69,18 @@ export default function Agenda() {
     setEditando(false);
     setModalAberta(false);
   };
+
+  const toggleParticipacao = () => {
+    const key = `${dataChave}_${eventoSelecionado.index}`;
+    setParticipacoes((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const estaParticipando = eventoSelecionado
+    ? participacoes[`${dataChave}_${eventoSelecionado.index}`]
+    : false;
 
   return (
     <ScrollView style={styles.container}>
@@ -148,7 +160,6 @@ export default function Agenda() {
         )}
       </View>
 
-      {/* Modal para visualizar/editar */}
       <Modal visible={modalAberta} animationType="slide" transparent={true}>
         <View style={styles.modalFundo}>
           <View style={styles.modalConteudo}>
@@ -196,13 +207,33 @@ export default function Agenda() {
                       {eventoSelecionado.hora} - {eventoSelecionado.local}
                     </Text>
                     <Text style={styles.eventoDescricao}>{eventoSelecionado.descricao}</Text>
+
                     {usuarioAutorizado && (
-                      <TouchableOpacity
-                        style={styles.botaoEditar}
-                        onPress={() => setEditando(true)}
-                      >
-                        <Text style={styles.botaoTexto}>Editar</Text>
-                      </TouchableOpacity>
+                      <>
+                        <TouchableOpacity
+                          style={styles.botaoEditar}
+                          onPress={() => setEditando(true)}
+                        >
+                          <Text style={styles.botaoTexto}>Editar</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                        style={[
+                            styles.botaoSalvar,
+                            {
+                            marginTop: 10,
+                            backgroundColor: estaParticipando ? "#dc2626" : "#16a34a", // vermelho ou verde
+                            },
+                        ]}
+                        onPress={toggleParticipacao}
+                        >
+                        <Text style={styles.botaoTexto}>
+                            {estaParticipando
+                            ? "Remover participação"
+                            : "Participar como voluntário"}
+                        </Text>
+                        </TouchableOpacity>
+                      </>
                     )}
                   </>
                 )}

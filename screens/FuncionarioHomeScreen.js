@@ -28,9 +28,9 @@ export default function HomeFuncionario() {
           <Text style={styles.cardText}>Próximos Eventos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={() => router.push('/Rota_AgendaScreen')}>
+        <TouchableOpacity style={styles.card} onPress={() => router.push('/Rota_EscalaVoluntarios')}>
           <Ionicons name="list-circle-outline" size={width * 0.08} color="#fff" />
-          <Text style={styles.cardText}>Voluntários do Dia</Text>
+          <Text style={styles.cardText}>Voluntários</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.card}>

@@ -31,11 +31,8 @@ export default function NovoAtendimento() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Novo Atendimento</Text>
 
-      <TouchableOpacity 
-        style={styles.floatingButton} 
-        onPress={handleCadastrarPessoa}
-      >
-        <MaterialIcons name="person-add" size={24} color="#fff" />
+      <TouchableOpacity style={styles.botaoFixo} onPress={handleCadastrarPessoa}>
+        <Text style={styles.botaoTexto}>+ Nova Pessoa</Text>
       </TouchableOpacity>
 
       {/* Busca de paciente */}
@@ -124,24 +121,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: width * 0.06,
     fontWeight: 'bold',
-    textAlign: 'center',
+    textAlign: 'left',
     marginVertical: height * 0.03,
   },
-  floatingButton: {
+  botaoFixo: {
     position: 'absolute',
-    top: height * 0.05,  // Mais para baixo na tela
-    right: width * 0.05,    // Um pouco afastado das bordas
-    backgroundColor: '#A5A5A5', // Cor neutra para não destacar tanto
-    width: 30,              // Menor
-    height: 30,             // Menor
-    borderRadius: 25,       // Tornar circular
+    top: height * 0.06,  // Ajusta a distância da parte inferior da tela
+    right: width * 0.05,    // Ajusta a distância da borda direita
+    backgroundColor: '#007AFF', // Cor roxa semelhante ao Nubank
+    paddingVertical: height * 0.010,  // Espaçamento vertical para o botão
+    paddingHorizontal: width * 0.010,  // Espaçamento horizontal para o botão
+    borderRadius: 30,         // Arredondamento do botão
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,     // Mais suave
+    shadowOpacity: 0.2,
     shadowRadius: 5,
-    elevation: 5,           // Menos "pesado"
+    elevation: 5,             // Sombra para o botão
+  },
+  botaoTexto: {
+    color: '#fff',   // Cor do texto dentro do botão
+    fontSize: width * 0.03,
+    fontWeight: 'bold',
   },
   input: {
     width: '100%',
@@ -193,15 +195,20 @@ const styles = StyleSheet.create({
   },
   salaButton: {
     padding: width * 0.05,
-    backgroundColor: '#007AFF',
+    backgroundColor: 'rgba(7, 145, 209, 0.2)',
     borderRadius: 5,
     marginBottom: height * 0.015,
   },
   salaButtonSelected: {
-    backgroundColor: '#005BB5',
+    padding: width * 0.05,
+    backgroundColor: 'rgba(7, 145, 209, 0.2)', // roxinho Nubank bem leve
+    borderRadius: 8,
+    marginBottom: height * 0.015,
+    borderWidth: 2,
+    borderColor: '#007AFF', // roxinho Nubank puro
   },
   salaButtonText: {
-    color: '#fff',
+    color: '#000',
     fontSize: width * 0.045,
   },
   salaButtonTextSelected: {
@@ -213,7 +220,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: '#D1FADF',
+    backgroundColor: 'rgba(17, 116, 230, 0.2)',
     padding: height * 0.015,
     borderRadius: 5,
     marginHorizontal: width * 0.02,
