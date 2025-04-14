@@ -18,13 +18,18 @@ export default function HomeFuncionario() {
           <Text style={styles.cardText}>Novo Atendimento</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card}>
+        <TouchableOpacity style={styles.card} onPress={() => router.push('/Rota_FilaDeEsperaScreen')}>
           <Ionicons name="people-outline" size={width * 0.08} color="#fff" />
           <Text style={styles.cardText}>Fila de Espera</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card}>
+        <TouchableOpacity style={styles.card} onPress={() => router.push('/Rota_AgendaScreen')}>
           <Ionicons name="calendar-outline" size={width * 0.08} color="#fff" />
+          <Text style={styles.cardText}>Próximos Eventos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.card} onPress={() => router.push('/Rota_AgendaScreen')}>
+          <Ionicons name="list-circle-outline" size={width * 0.08} color="#fff" />
           <Text style={styles.cardText}>Voluntários do Dia</Text>
         </TouchableOpacity>
 

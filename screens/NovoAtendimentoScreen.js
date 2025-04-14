@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,14 +23,25 @@ export default function NovoAtendimento() {
     console.log('Atendimento salvo', { buscaPaciente, novaQueixa, sala });
   };
 
+  const handleCadastrarPessoa = () => {
+    console.log('Abrir formulário de cadastro de nova pessoa');
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Novo Atendimento</Text>
 
+      <TouchableOpacity 
+        style={styles.floatingButton} 
+        onPress={handleCadastrarPessoa}
+      >
+        <MaterialIcons name="person-add" size={24} color="#fff" />
+      </TouchableOpacity>
+
       {/* Busca de paciente */}
       <TextInput
         style={styles.input}
-        placeholder="Digite o nome ou data de nascimento do paciente"
+        placeholder="pesquise pelo nome ou data de nascimento"
         value={buscaPaciente}
         onChangeText={(text) => setBuscaPaciente(text)}
       />
@@ -114,6 +126,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginVertical: height * 0.03,
+  },
+  floatingButton: {
+    position: 'absolute',
+    top: height * 0.05,  // Mais para baixo na tela
+    right: width * 0.05,    // Um pouco afastado das bordas
+    backgroundColor: '#A5A5A5', // Cor neutra para não destacar tanto
+    width: 30,              // Menor
+    height: 30,             // Menor
+    borderRadius: 25,       // Tornar circular
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,     // Mais suave
+    shadowRadius: 5,
+    elevation: 5,           // Menos "pesado"
   },
   input: {
     width: '100%',
