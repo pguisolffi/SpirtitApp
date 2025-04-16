@@ -1,29 +1,25 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  StyleSheet,
-} from 'react-native';
-import DraggableFlatList from 'react-native-draggable-flatlist';
+import { View, Text, TouchableOpacity, Modal, TextInput, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import SegmentedControlTab from 'react-native-segmented-control-tab';
+import DraggableFlatList from 'react-native-draggable-flatlist';
 
 const salas = ['Maca', 'Passe', 'Fraterno'];
 
 const WaitingQueue = () => {
   const [patients, setPatients] = useState([
-    { id: '1', name: 'João Silva', birthDate: '12/03/1990', room: 'Maca', priority: false },
-    { id: '2', name: 'Maria Souza', birthDate: '23/07/1985', room: 'Fraterno', priority: true },
-    { id: '3', name: 'Carlos Oliveira', birthDate: '15/11/1980', room: 'Passe', priority: false },
-    { id: '4', name: 'Ana Costa', birthDate: '05/09/1995', room: 'Fraterno', priority: true },
+    { id: '1', name: 'João Silva', birthDate: '12/03/1990', room: 'Maca', priorityColor: '#FFD700' },
+    { id: '2', name: 'Maria Souza', birthDate: '23/07/1985', room: 'Fraterno', priorityColor: '#FFD700' },
+    { id: '3', name: 'Carlos Oliveira', birthDate: '15/11/1980', room: 'Passe', priorityColor: '#FFF' },
+    { id: '4', name: 'Ana Costa', birthDate: '05/09/1995', room: 'Fraterno', priorityColor: '#FFF' },
   ]);
+
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [roomModalVisible, setRoomModalVisible] = useState(false);
+  const [colorModalVisible, setColorModalVisible] = useState(false);  // Novo estado para controlar o modal de cor
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [expandedCard, setExpandedCard] = useState(null);
 
   const handleEdit = (patient) => {
     setSelectedPatient(patient);
@@ -49,66 +45,90 @@ const WaitingQueue = () => {
     setRoomModalVisible(false);
   };
 
-  const togglePriority = (id) => {
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, priority: !p.priority } : p
-      )
-    );
-  };
-
   const handleTabChange = (index) => {
     setSelectedIndex(index);
   };
 
-  // Filtrando pacientes com base no filtro selecionado
+  const handleShowHistory = (patientId) => {
+    alert(`Histórico de atendimentos para o paciente ${patientId}`);
+  };
+
+  const handleColorChange = (color) => {
+    if (!selectedPatient) return;
+    const updatedPatient = { ...selectedPatient, priorityColor: color };
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === selectedPatient.id ? updatedPatient : p
+      )
+    );
+    setSelectedPatient(updatedPatient);
+    setColorModalVisible(false);  // Fecha o modal após a escolha da cor
+  };
+
   const filteredPatients =
     selectedIndex === 0
       ? patients
       : patients.filter((patient) => patient.room === salas[selectedIndex - 1]);
 
-  const renderItem = ({ item, drag, isActive }) => (
-    <TouchableOpacity
-      style={[styles.card, item.priority ? styles.priorityCard : null, isActive && { opacity: 0.8 }]}
-      onLongPress={drag}
-    >
-      <Text style={styles.cardText}>Nome: {item.name}</Text>
-      <Text style={styles.cardText}>Nascimento: {item.birthDate}</Text>
-      <Text style={styles.roomText}>{item.room}</Text>
+  const renderItem = ({ item, drag, isActive }) => {
+    const position = filteredPatients.filter(p => p.room === item.room)
+                                     .findIndex(p => p.id === item.id) + 1;
 
-      <View style={styles.iconContainer}>
-        <TouchableOpacity onPress={() => handleEdit(item)} style={styles.iconButton}>
-          <Icon name="pencil" size={20} color="#fff" />
-        </TouchableOpacity>
+    return (
+      <TouchableOpacity
+        style={[styles.card, { borderColor: item.priorityColor, borderLeftWidth: 6, opacity: isActive ? 0.5 : 1 }]}
+        onLongPress={drag}
+        onPress={() => setExpandedCard(expandedCard === item.id ? null : item.id)}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardName}>{item.name}</Text>
+          <Text style={styles.positionText}>#{position}</Text>
+        </View>
+        <Text style={styles.cardSubText}>Nascimento: {item.birthDate}</Text>
+        <Text style={[styles.cardSubText, { fontWeight: 'bold' }]}>{item.room}</Text>
 
-        <TouchableOpacity
-          onPress={() => {
-            setSelectedPatient(item);
-            setRoomModalVisible(true);
-          }}
-          style={styles.iconButton}
-        >
-          <Icon name="exchange" size={20} color="#fff" />
-        </TouchableOpacity>
+        {expandedCard === item.id && (
+          <View style={styles.cardActions}>
+            <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionButton}>
+              <Icon name="pencil" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedPatient(item);
+                setRoomModalVisible(true);
+              }}
+              style={styles.actionButton}
+            >
+              <Icon name="exchange" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleShowHistory(item.id)}
+              style={styles.actionButton}
+            >
+              <Icon name="eye" size={18} color="#fff" />
+            </TouchableOpacity>
+            {/* Botão para abrir o modal de cor */}
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedPatient(item);
+                setColorModalVisible(true);  // Abre o modal de cor
+              }}
+              style={[styles.actionButton, { backgroundColor: item.priorityColor || '#FFF' }]}
+            >
+              <Icon name="paint-brush" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
-        <TouchableOpacity
-          onPress={() => togglePriority(item.id)}
-          style={styles.priorityIconContainer}
-        >
-          <Icon
-            name="star"
-            size={20}
-            color={item.priority ? '#FF6347' : '#FFD700'}
-            style={[styles.priorityIcon, { opacity: item.priority ? 1 : 0.5 }]}
-          />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleDragEnd = (data) => {
+    setPatients(data);
+  };
 
   return (
     <View style={styles.container}>
-      {/* Controle de Segmentos para "Todos" ou uma Sala específica */}
       <SegmentedControlTab
         values={['Todos', ...salas]}
         selectedIndex={selectedIndex}
@@ -121,12 +141,12 @@ const WaitingQueue = () => {
 
       <DraggableFlatList
         data={filteredPatients}
-        onDragEnd={({ data }) => setPatients(data)}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        onDragEnd={({ data }) => handleDragEnd(data)}
       />
 
-      {/* Modal de edição */}
+      {/* Modal de edição de paciente */}
       <Modal visible={isModalVisible} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -153,7 +173,7 @@ const WaitingQueue = () => {
         </View>
       </Modal>
 
-      {/* Modal de mudança de sala */}
+      {/* Modal para mudança de sala */}
       <Modal visible={roomModalVisible} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -168,7 +188,30 @@ const WaitingQueue = () => {
             ))}
             <TouchableOpacity
               onPress={() => setRoomModalVisible(false)}
-              style={styles.editButton}
+              style={styles.cancelButton}
+            >
+              <Text style={styles.buttonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para seleção de cor */}
+      <Modal visible={colorModalVisible} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.label}>Escolha a cor para a borda:</Text>
+            {/* Lista de cores para selecionar */}
+            {['#FF6347', '#FFD700', '#32CD32', '#1E90FF', '#8A2BE2'].map((color) => (
+              <TouchableOpacity
+                key={color}
+                onPress={() => handleColorChange(color)}
+                style={[styles.colorOption, { backgroundColor: color }]}
+              />
+            ))}
+            <TouchableOpacity
+              onPress={() => setColorModalVisible(false)}
+              style={styles.cancelButton}
             >
               <Text style={styles.buttonText}>Cancelar</Text>
             </TouchableOpacity>
@@ -184,88 +227,22 @@ const styles = StyleSheet.create({
   segmentedControl: { marginBottom: 20 },
   activeTab: { backgroundColor: '#4CAF50' },
   inactiveTab: { backgroundColor: '#F0F0F0' },
-  card: {
-    backgroundColor: '#eee',
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
-  },
-  priorityCard: {
-    backgroundColor: '#ffdddd',
-    borderColor: '#ff0000',
-    borderWidth: 1.5,
-  },
-  cardText: { fontSize: 16, marginBottom: 5 },
-  roomText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  iconContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  iconButton: {
-    backgroundColor: '#4CAF50',
-    padding: 8,
-    borderRadius: 5,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  priorityIconContainer: {
-    padding: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  priorityIcon: {
-    fontSize: 20,
-  },
-  saveButton: {
-    backgroundColor: '#2196F3',
-    padding: 8,
-    borderRadius: 5,
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  buttonText: { color: '#fff', fontSize: 15 },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    width: '80%',
-    borderRadius: 10,
-    alignItems: 'stretch',
-  },
-  input: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    padding: 8,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  moveButton: {
-    backgroundColor: '#FF9800',
-    padding: 8,
-    borderRadius: 5,
-    marginTop: 5,
-    alignItems: 'center',
-  },
-  editButton: {
-    backgroundColor: '#FF5722',
-    padding: 8,
-    borderRadius: 5,
-    marginTop: 5,
-    alignItems: 'center',
-  },
+  card: { padding: 15, marginBottom: 10, borderRadius: 8, backgroundColor: '#fff' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  cardName: { fontSize: 16, fontWeight: 'bold' },
+  positionText: { fontSize: 14, color: '#888' },
+  cardSubText: { fontSize: 14, color: '#555' },
+  cardActions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
+  actionButton: { padding: 5, borderRadius: 50, backgroundColor: '#4CAF50' },
+  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  modalContent: { padding: 20, backgroundColor: '#fff', borderRadius: 8, width: 300 },
+  cancelButton: { marginTop: 15, backgroundColor: '#f44336', padding: 10, borderRadius: 5 },
+  moveButton: { backgroundColor: '#2196F3', padding: 10, borderRadius: 5, marginBottom: 10 },
+  saveButton: { backgroundColor: '#4CAF50', padding: 10, borderRadius: 5 },
+  buttonText: { color: '#fff', textAlign: 'center' },
+  input: { height: 40, borderColor: '#ddd', borderWidth: 1, marginBottom: 10, paddingLeft: 10 },
+  label: { marginVertical: 5, fontSize: 16 },
+  colorOption: { width: 50, height: 50, margin: 5, borderRadius: 5 },
 });
 
 export default WaitingQueue;

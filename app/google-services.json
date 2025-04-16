@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1008003125312",
+    "project_id": "centroespiritabzmbd",
+    "storage_bucket": "centroespiritabzmbd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008003125312:android:9c263d6023821abec7cfa5",
+        "android_client_info": {
+          "package_name": "CentroEspirita.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB32P-8URzpmfOWCXIIUcosRVzURwFjT6Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

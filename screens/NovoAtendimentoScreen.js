@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';  
+import { Alert } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
 export default function NovoAtendimento() {
+    const router = useRouter();
   const [historico, setHistorico] = useState([
-    { id: 1, queixa: 'Dor de cabeça constante', resposta: 'Recomendado repouso e hidratação' },
-    { id: 2, queixa: 'Sentindo-se cansado e sem energia', resposta: 'Sugerido exame de sangue' },
-    { id: 3, queixa: 'Insônia frequente', resposta: 'Evitar cafeína à noite' },
-    { id: 4, queixa: 'Ansiedade em situações sociais', resposta: 'Encaminhado para atendimento fraterno' },
-    { id: 5, queixa: 'Falta de apetite', resposta: 'Observar alimentação e retorno em 7 dias' },
+    { id: 1, queixa: 'Dor de cabeça constante', resposta: 'Recomendado repouso e hidratação', data: '01/04/2025' },
+    { id: 2, queixa: 'Sentindo-se cansado e sem energia', resposta: 'Sugerido exame de sangue', data: '05/04/2025' },
+    { id: 3, queixa: 'Insônia frequente', resposta: 'Evitar cafeína à noite', data: '10/04/2025' },
+    { id: 4, queixa: 'Ansiedade em situações sociais', resposta: 'Encaminhado para atendimento fraterno', data: '12/04/2025' },
+    { id: 5, queixa: 'Falta de apetite', resposta: 'Observar alimentação e retorno em 7 dias', data: '14/04/2025' },
   ]);
+  
   const [mostrarHistoricoCompleto, setMostrarHistoricoCompleto] = useState(false);
   const [novaQueixa, setNovaQueixa] = useState('');
   const [sala, setSala] = useState('');
@@ -20,7 +24,23 @@ export default function NovoAtendimento() {
   const salas = ['Maca', 'Passe', 'Fraterno'];
 
   const handleSalvarAtendimento = () => {
+    if (!buscaPaciente.trim()) {
+      Alert.alert('Atenção', 'Por favor, preencha o nome da pessoa.');
+      return;
+    }
+  
+    if (!novaQueixa.trim()) {
+      Alert.alert('Atenção', 'Por favor, preencha as informações.');
+      return;
+    }
+  
+    if (!sala) {
+      Alert.alert('Atenção', 'Por favor, selecione uma sala.');
+      return;
+    }
+  
     console.log('Atendimento salvo', { buscaPaciente, novaQueixa, sala });
+    Alert.alert('Sucesso', 'Atendimento salvo com sucesso!');
   };
 
   const handleCadastrarPessoa = () => {
@@ -29,9 +49,9 @@ export default function NovoAtendimento() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Novo Atendimento</Text>
+      <Text style={styles.title}>Cadastrar Atendimento</Text>
 
-      <TouchableOpacity style={styles.botaoFixo} onPress={handleCadastrarPessoa}>
+      <TouchableOpacity style={styles.botaoFixo} onPress={() => router.push('/Rota_CadastroPessoaScreen')}>
         <Text style={styles.botaoTexto}>+ Nova Pessoa</Text>
       </TouchableOpacity>
 
@@ -56,13 +76,15 @@ export default function NovoAtendimento() {
       <View style={styles.historicoContainer}>
         <Text style={styles.subTitle}>Histórico</Text>
         {(mostrarHistoricoCompleto ? historico : historico.slice(0, 2)).map((item) => (
-          <View key={item.id} style={styles.historicoItem}>
-            <Text style={styles.historicoText}>{item.queixa}</Text>
-            {item.resposta && (
-              <Text style={styles.respostaText}>{item.resposta}</Text>
-            )}
-          </View>
-        ))}
+  <View key={item.id} style={styles.historicoItem}>
+    <Text style={styles.historicoText}>{item.queixa}</Text>
+    <Text style={styles.historicoData}>{item.data}</Text>
+    {item.resposta && (
+      <Text style={styles.respostaText}>{item.resposta}</Text>
+    )}
+  </View>
+))}
+
         {historico.length > 2 && (
           <TouchableOpacity onPress={() => setMostrarHistoricoCompleto(!mostrarHistoricoCompleto)}>
             <Text style={styles.verMais}>
@@ -105,7 +127,7 @@ export default function NovoAtendimento() {
           style={[styles.button, styles.cancelButton]}
           onPress={() => console.log('Cancelando atendimento')}
         >
-          <Text style={styles.buttonText}>Cancelar</Text>
+          <Text style={styles.cancelbuttonText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -119,9 +141,12 @@ const styles = StyleSheet.create({
     padding: width * 0.05,
   },
   title: {
-    fontSize: width * 0.06,
+    color: '#007AFF',
+    paddingHorizontal: width * 0.0000, 
+    fontSize: width * 0.055,
     fontWeight: 'bold',
     textAlign: 'left',
+
     marginVertical: height * 0.03,
   },
   botaoFixo: {
@@ -177,6 +202,12 @@ const styles = StyleSheet.create({
     fontSize: width * 0.04,
     color: '#333',
   },
+  historicoData: {
+    fontSize: width * 0.033,
+    color: '#999',
+    marginTop: height * 0.004,
+    marginLeft: width * 0.01,
+  },
   respostaText: {
     fontSize: width * 0.038,
     color: '#666',
@@ -201,11 +232,11 @@ const styles = StyleSheet.create({
   },
   salaButtonSelected: {
     padding: width * 0.05,
-    backgroundColor: 'rgba(7, 145, 209, 0.2)', // roxinho Nubank bem leve
+    backgroundColor: 'rgba(7, 145, 209, 0.2)', 
     borderRadius: 8,
     marginBottom: height * 0.015,
     borderWidth: 2,
-    borderColor: '#007AFF', // roxinho Nubank puro
+    borderColor: '#007AFF', 
   },
   salaButtonText: {
     color: '#000',
@@ -220,23 +251,28 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: 'rgba(17, 116, 230, 0.2)',
+    backgroundColor: 'rgba(240, 245, 245, 0.2)',
     padding: height * 0.015,
     borderRadius: 5,
     marginHorizontal: width * 0.02,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#A5E5BC',
+    borderColor: '#007AFF', 
   },
   cancelButton: {
-    backgroundColor: '#FDDCDC',
+    backgroundColor: 'rgba(240, 245, 245, 0.2)',
     borderColor: '#F5A3A3',
     justifyContent: 'center',
     borderWidth: 1,
   },
   buttonText: {
-    color: '#146C43',
+    color: '#007AFF', 
+    fontSize: width * 0.045,
+    fontWeight: 'bold',
+  },
+  cancelbuttonText: {
+    color: '#F5A3A3',
     fontSize: width * 0.045,
     fontWeight: 'bold',
   },
