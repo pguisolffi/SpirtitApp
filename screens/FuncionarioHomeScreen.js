@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';  
+import seedBzmAtendimentoHist from '../gambiarrasTemporarias/seedBzmAtendimentoHist';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,6 +47,11 @@ export default function HomeFuncionario() {
         <TouchableOpacity style={styles.card}>
           <Ionicons name="book-outline" size={width * 0.08} color="#fff" />
           <Text style={styles.cardText}>Cursos e Palestras</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.card} onPress={() => seedBzmAtendimentoHist('1744840882517')}>
+          <Ionicons name="build-outline" size={width * 0.08} color="#fff" />
+          <Text style={styles.cardText}>DEV</Text>
         </TouchableOpacity>
 
 
