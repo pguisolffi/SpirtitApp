@@ -12,7 +12,20 @@
           "package_name": "CentroEspirita.com"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1008003125312-cnvs4eub81dikmnt17v7pmga0hkin5e8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "CentroEspirita.com",
+            "certificate_hash": "a9e6b8617c95e5c5068508e3c2c4e9f80b1d8e4d"
+          }
+        },
+        {
+          "client_id": "1008003125312-51oa3qfjtm4ibtnhu59q0d4jjtm52lao.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB32P-8URzpmfOWCXIIUcosRVzURwFjT6Q"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1008003125312-51oa3qfjtm4ibtnhu59q0d4jjtm52lao.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

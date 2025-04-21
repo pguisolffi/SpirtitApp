@@ -31,29 +31,33 @@ export default function NovoAtendimento() {
 
   const buscarPacientes = async (texto) => {
     setBuscaPaciente(texto);
-
+  
     if (texto.length < 2) {
       setSugestoes([]);
+      setHistorico([]);
       return;
     }
-
+  
     const colRef = collection(db, 'bzmpessoa');
     const q = query(colRef, where('nome', '>=', texto), where('nome', '<=', texto + '\uf8ff'));
-
+  
     try {
       const snapshot = await getDocs(q);
-      const pacientes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const pacientes = snapshot.docs.map(doc => ({ id: doc.id, idPessoa: doc.data().idPessoa, ...doc.data() }));
       setSugestoes(pacientes);
     } catch (error) {
       console.error('Erro ao buscar paciente:', error);
     }
   };
-
+  
+  // Função ao selecionar o paciente
   const selecionarPaciente = (paciente) => {
     setBuscaPaciente(paciente.nome);
     setSelecionado(paciente);
     setSugestoes([]);
+    buscarHistoricoDoPaciente(paciente.idPessoa); 
   };
+  
 
 
   const handleSalvarAtendimento = () => {
@@ -79,6 +83,39 @@ export default function NovoAtendimento() {
   const handleCadastrarPessoa = () => {
     console.log('Abrir formulário de cadastro de nova pessoa');
   };
+
+
+  const buscarHistoricoDoPaciente = async (idPessoa) => {
+  
+    try {
+      // Passo 1: Buscar o histórico utilizando o campo 'idPessoa'
+      const colRef = collection(db, 'bzmAtendimentoHist');
+      const q = query(colRef, where('id_paciente', '==', idPessoa));
+      const snapshot = await getDocs(q);
+
+  
+      const historicoFormatado = snapshot.docs.map((doc, index) => {
+        const dados = doc.data();
+  
+        const dataFormatada = new Date(dados.data_hora?.seconds * 1000).toLocaleDateString('pt-BR');
+  
+        return {
+          id: index + 1,
+          queixa: dados.queixa,
+          resposta: dados.orientacao_recebida,
+          data: dataFormatada,
+        };
+      });
+  
+      setHistorico(historicoFormatado);
+    } catch (error) {
+      console.error('Erro ao buscar histórico do paciente:', error);
+    }
+  };
+  
+
+  
+
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -182,6 +219,7 @@ export default function NovoAtendimento() {
 
 const styles = StyleSheet.create({
   container: {
+    paddingTop: height * 0.1,
     flexGrow: 1,
     backgroundColor: '#fff',
     padding: width * 0.05
@@ -196,7 +234,7 @@ const styles = StyleSheet.create({
   },
   botaoFixo: {
     position: 'absolute',
-    top: height * 0.06,  // Ajusta a distância da parte inferior da tela
+    top: height * 0.13,  // Ajusta a distância da parte inferior da tela
     right: width * 0.05,    // Ajusta a distância da borda direita
     backgroundColor: '#007AFF', // Cor roxa semelhante ao Nubank
     paddingVertical: height * 0.010,  // Espaçamento vertical para o botão

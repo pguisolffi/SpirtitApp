@@ -1,10 +1,48 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, TextInput, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  StyleSheet,
+  Dimensions,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import SegmentedControlTab from 'react-native-segmented-control-tab';
 import DraggableFlatList from 'react-native-draggable-flatlist';
 
+const { width, height } = Dimensions.get('window');
 const salas = ['Maca', 'Passe', 'Fraterno'];
+
+const CustomSalaSelector = ({ selectedIndex, onChange }) => {
+  const labels = ['Todos', 'Maca', 'Passe', 'Fraterno'];
+  const icons = ['👥', '🛏', '👐', '🤝'];
+
+  return (
+    <View style={styles.salaSelectorContainer}>
+      {labels.map((label, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.salaButton,
+            selectedIndex === index && styles.salaButtonSelected,
+          ]}
+          onPress={() => onChange(index)}
+        >
+          <Text
+            style={[
+              styles.salaButtonText,
+              selectedIndex === index && styles.salaButtonTextSelected,
+            ]}
+            numberOfLines={1}
+          >
+            {icons[index]} {label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
 const WaitingQueue = () => {
   const [patients, setPatients] = useState([
@@ -17,7 +55,7 @@ const WaitingQueue = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isModalVisible, setModalVisible] = useState(false);
   const [roomModalVisible, setRoomModalVisible] = useState(false);
-  const [colorModalVisible, setColorModalVisible] = useState(false);  // Novo estado para controlar o modal de cor
+  const [colorModalVisible, setColorModalVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [expandedCard, setExpandedCard] = useState(null);
 
@@ -37,9 +75,7 @@ const WaitingQueue = () => {
     if (!selectedPatient) return;
     const updatedPatient = { ...selectedPatient, room };
     setPatients((prev) =>
-      prev.map((p) =>
-        p.id === selectedPatient.id ? updatedPatient : p
-      )
+      prev.map((p) => (p.id === selectedPatient.id ? updatedPatient : p))
     );
     setSelectedPatient(updatedPatient);
     setRoomModalVisible(false);
@@ -57,12 +93,10 @@ const WaitingQueue = () => {
     if (!selectedPatient) return;
     const updatedPatient = { ...selectedPatient, priorityColor: color };
     setPatients((prev) =>
-      prev.map((p) =>
-        p.id === selectedPatient.id ? updatedPatient : p
-      )
+      prev.map((p) => (p.id === selectedPatient.id ? updatedPatient : p))
     );
     setSelectedPatient(updatedPatient);
-    setColorModalVisible(false);  // Fecha o modal após a escolha da cor
+    setColorModalVisible(false);
   };
 
   const filteredPatients =
@@ -71,12 +105,19 @@ const WaitingQueue = () => {
       : patients.filter((patient) => patient.room === salas[selectedIndex - 1]);
 
   const renderItem = ({ item, drag, isActive }) => {
-    const position = filteredPatients.filter(p => p.room === item.room)
-                                     .findIndex(p => p.id === item.id) + 1;
+    const position =
+      filteredPatients.filter((p) => p.room === item.room).findIndex((p) => p.id === item.id) + 1;
 
     return (
       <TouchableOpacity
-        style={[styles.card, { borderColor: item.priorityColor, borderLeftWidth: 6, opacity: isActive ? 0.5 : 1 }]}
+        style={[
+          styles.card,
+          {
+            borderColor: item.priorityColor,
+            borderLeftWidth: 6,
+            opacity: isActive ? 0.5 : 1,
+          },
+        ]}
         onLongPress={drag}
         onPress={() => setExpandedCard(expandedCard === item.id ? null : item.id)}
       >
@@ -107,11 +148,10 @@ const WaitingQueue = () => {
             >
               <Icon name="eye" size={18} color="#fff" />
             </TouchableOpacity>
-            {/* Botão para abrir o modal de cor */}
             <TouchableOpacity
               onPress={() => {
                 setSelectedPatient(item);
-                setColorModalVisible(true);  // Abre o modal de cor
+                setColorModalVisible(true);
               }}
               style={[styles.actionButton, { backgroundColor: item.priorityColor || '#FFF' }]}
             >
@@ -129,15 +169,7 @@ const WaitingQueue = () => {
 
   return (
     <View style={styles.container}>
-      <SegmentedControlTab
-        values={['Todos', ...salas]}
-        selectedIndex={selectedIndex}
-        onTabPress={handleTabChange}
-        tabsContainerStyle={styles.segmentedControl}
-        activeTabStyle={styles.activeTab}
-        tabStyle={styles.inactiveTab}
-        borderRadius={5}
-      />
+      <CustomSalaSelector selectedIndex={selectedIndex} onChange={handleTabChange} />
 
       <DraggableFlatList
         data={filteredPatients}
@@ -201,7 +233,6 @@ const WaitingQueue = () => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.label}>Escolha a cor para a borda:</Text>
-            {/* Lista de cores para selecionar */}
             {['#FF6347', '#FFD700', '#32CD32', '#1E90FF', '#8A2BE2'].map((color) => (
               <TouchableOpacity
                 key={color}
@@ -223,26 +254,128 @@ const WaitingQueue = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
-  segmentedControl: { marginBottom: 20 },
-  activeTab: { backgroundColor: '#4CAF50' },
-  inactiveTab: { backgroundColor: '#F0F0F0' },
-  card: { padding: 15, marginBottom: 10, borderRadius: 8, backgroundColor: '#fff' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardName: { fontSize: 16, fontWeight: 'bold' },
-  positionText: { fontSize: 14, color: '#888' },
-  cardSubText: { fontSize: 14, color: '#555' },
-  cardActions: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
-  actionButton: { padding: 5, borderRadius: 50, backgroundColor: '#4CAF50' },
-  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  modalContent: { padding: 20, backgroundColor: '#fff', borderRadius: 8, width: 300 },
-  cancelButton: { marginTop: 15, backgroundColor: '#f44336', padding: 10, borderRadius: 5 },
-  moveButton: { backgroundColor: '#2196F3', padding: 10, borderRadius: 5, marginBottom: 10 },
-  saveButton: { backgroundColor: '#4CAF50', padding: 10, borderRadius: 5 },
-  buttonText: { color: '#fff', textAlign: 'center' },
-  input: { height: 40, borderColor: '#ddd', borderWidth: 1, marginBottom: 10, paddingLeft: 10 },
-  label: { marginVertical: 5, fontSize: 16 },
-  colorOption: { width: 50, height: 50, margin: 5, borderRadius: 5 },
+  container: {
+    paddingTop: height * 0.1,
+    flex: 1,
+    paddingHorizontal: width * 0.03,
+    paddingVertical: height * 0.02,
+  },
+  salaSelectorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: height * 0.02,
+    backgroundColor: '#eee',
+    borderRadius: width * 0.05,
+    padding: 1,
+  },
+  salaButton: {
+    width: width * 0.22,
+    alignItems: 'center',
+    paddingVertical: height * 0.015,
+    marginHorizontal: 4,
+    backgroundColor: '#ddd',
+    borderRadius: width * 0.05,
+  },
+  salaButtonSelected: {
+    backgroundColor: '#6A5ACD',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  salaButtonText: {
+    fontSize: width * 0.032,
+    color: '#444',
+    fontWeight: '600',
+  },
+  salaButtonTextSelected: {
+    color: '#fff',
+  },
+  card: {
+    padding: width * 0.04,
+    marginBottom: height * 0.015,
+    borderRadius: width * 0.03,
+    backgroundColor: '#fff',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cardName: {
+    fontSize: width * 0.045,
+    fontWeight: 'bold',
+  },
+  positionText: {
+    fontSize: width * 0.04,
+    color: '#888',
+  },
+  cardSubText: {
+    fontSize: width * 0.035,
+    color: '#555',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: height * 0.01,
+  },
+  actionButton: {
+    padding: width * 0.025,
+    borderRadius: 50,
+    backgroundColor: '#4CAF50',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    padding: width * 0.05,
+    backgroundColor: '#fff',
+    borderRadius: width * 0.03,
+    width: width * 0.8,
+  },
+  cancelButton: {
+    marginTop: height * 0.02,
+    backgroundColor: '#f44336',
+    padding: height * 0.015,
+    borderRadius: width * 0.02,
+  },
+  moveButton: {
+    backgroundColor: '#2196F3',
+    padding: height * 0.015,
+    borderRadius: width * 0.02,
+    marginBottom: height * 0.01,
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+    padding: height * 0.015,
+    borderRadius: width * 0.02,
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: width * 0.04,
+  },
+  input: {
+    height: height * 0.06,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    marginBottom: height * 0.015,
+    paddingLeft: width * 0.03,
+    fontSize: width * 0.04,
+  },
+  label: {
+    marginVertical: height * 0.01,
+    fontSize: width * 0.04,
+  },
+  colorOption: {
+    width: width * 0.1,
+    height: width * 0.1,
+    margin: width * 0.015,
+    borderRadius: width * 0.015,
+  },
 });
 
 export default WaitingQueue;

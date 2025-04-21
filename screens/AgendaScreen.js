@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Modal
+  View, Text, TextInput, TouchableOpacity, ScrollView,Dimensions, StyleSheet, Modal
 } from "react-native";
 import CalendarPicker from "react-native-calendar-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+const { width, height } = Dimensions.get("window");
 
 export default function Agenda() {
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
@@ -253,7 +255,7 @@ export default function Agenda() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, backgroundColor: "#fff" },
+  container: { paddingTop: height * 0.1, padding: 16, backgroundColor: "#fff" },
   titulo: { fontSize: 26, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
   subtitulo: { fontSize: 18, fontWeight: "600" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },

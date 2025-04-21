@@ -1,48 +1,32 @@
 import { db } from '../screens/firebaseConfig'; // Ajuste o caminho conforme necessário
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch,setDoc  } from 'firebase/firestore';
 
-const seedBzmAtendimentoHist = async (idPaciente) => {
-  const historicoMock = [
+/*const seedBzmLivro = async () => {
+  const livros = [
     {
-      data_hora: new Date(2024, 3, 1, 9, 15),
-      queixa: 'Dor de cabeça intensa',
-      orientacao_recebida: 'Orientado a fazer repouso e hidratação, prescrito analgésico.',
-      sala_atendida: 'Maca',
-      orientador: 'Alcione',
-      id_paciente: idPaciente,
+      id: '1',
+      titulo: 'A Alma dos Animais',
+      autor: 'Ernesto Bozzano',
+      linkPDF: 'https://drive.google.com/uc?export=download&id=1Zkk-TinLYp8Ni6rSF0judez3_ZqX3Unn',
     },
     {
-      data_hora: new Date(2024, 3, 5, 14, 30),
-      queixa: 'Tontura ao levantar',
-      orientacao_recebida: 'Realizados testes de glicemia. Orientado a se alimentar melhor e voltar se persistir.',
-      sala_atendida: 'Maca',
-      orientador: 'Roberto',
-      id_paciente: idPaciente,
-    },
-    {
-      data_hora: new Date(2024, 3, 12, 11, 0),
-      queixa: 'Retorno para avaliação',
-      orientacao_recebida: 'Avaliação positiva. Paciente sem sintomas. Liberado.',
-      sala_atendida: 'Passe',
-      orientador: 'Daniel',
-      id_paciente: idPaciente,
+      id: '2',
+      titulo: 'Nosso Lar',
+      autor: 'André Luiz',
+      linkPDF: 'https://drive.google.com/uc?export=download&id=1Zkk-TinLYp8Ni6rSF0judez3_ZqX3Unn',
     },
   ];
 
   try {
-    const batch = writeBatch(db);
-    const collectionRef = collection(db, 'bzmAtendimentoHist');
-
-    historicoMock.forEach((docData) => {
-      const docRef = doc(collectionRef);
-      batch.set(docRef, docData);
-    });
-
-    await batch.commit();
-    console.log(`✅ Mock inserido em 'bzmAtendimentoHist' para paciente ${idPaciente}`);
+    for (const livro of livros) {
+      await setDoc(doc(db, 'bzmLivro', livro.id), livro);
+      console.log(`Livro ${livro.titulo} inserido com sucesso.`);
+    }
+    alert('Livros inseridos com sucesso!');
   } catch (error) {
-    console.error('Erro ao inserir dados mock:', error);
+    console.error('Erro ao inserir livros:', error);
+    alert('Erro ao criar seed de livros.');
   }
 };
 
-export default seedBzmAtendimentoHist;
+export default seedBzmLivro;*/
