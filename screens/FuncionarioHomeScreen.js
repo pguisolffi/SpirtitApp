@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import dev from '../gambiarrasTemporarias/dev';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,7 +25,7 @@ const menuItems = [
   { label: 'Biblioteca', icon: 'library-outline', route: '/Rota_Livros' },
   { label: 'Orações', icon: 'heart-outline', route: null },
   { label: 'Cursos e Palestras', icon: 'book-outline', route: null },
-  { label: 'DEV', icon: 'build-outline', route: 'dev' },
+  { label: 'DEV', icon: 'build-outline', action: dev },
 ];
 
 export default function HomeFuncionario() {
@@ -36,35 +37,43 @@ export default function HomeFuncionario() {
       const auth = getAuth();
       const email = auth.currentUser?.email;
   
+      console.log('🟢 Email logado:', email);
+  
       if (!email) return;
   
       try {
-        const snapshot = await getDocs(collection(db, 'bzmUsuario'));
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.email?.toLowerCase().trim() === email.toLowerCase().trim()) {
-            const nomeCompleto = data.nome || 'Amigo';
-            const primeiro = nomeCompleto.split(' ')[0];
-            setPrimeiroNome(primeiro);
-          }
-        });
+        const q = query(collection(db, 'bzmpessoa'), where('email', '==', email));
+        const snapshot = await getDocs(q);
+  
+        console.log('📦 Snapshot size:', snapshot.size);
+  
+        if (!snapshot.empty) {
+          const dados = snapshot.docs[0].data();
+          console.log('👤 Dados do Firestore:', dados);
+  
+          const nomeCompleto = dados.nome || 'Amigo';
+          const primeiro = nomeCompleto.split(' ')[0];
+          setPrimeiroNome(primeiro);
+        } else {
+          console.warn('⚠️ Nenhum documento encontrado com esse email');
+        }
       } catch (err) {
-        console.error('Erro ao buscar nome:', err);
+        console.error('❌ Erro ao buscar nome no Firestore:', err);
       }
     };
   
     buscarNomeDoUsuario();
   }, []);
   
-  
-
-  const handlePress = (item) => {
-    if (item.route === 'dev') {
-      // executar função dev
+  const handlePress = async (item) => {
+    if (item.action) {
+      console.log(`🛠 Executando: ${item.label}`);
+      await item.action(); // agora sim, execução no clique
     } else if (item.route) {
       router.push(item.route);
     }
   };
+  
 
   const renderItem = ({ item }) => (
     <TouchableOpacity

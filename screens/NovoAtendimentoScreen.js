@@ -1,46 +1,52 @@
+// NovoAtendimento.js (versão melhorada)
+
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+  FlatList,
+  LayoutAnimation,
+  Alert,
+  Platform,
+  UIManager,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig'; // ajuste esse path conforme a sua pasta
-import { FlatList } from 'react-native';
+import { db } from './firebaseConfig';
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental &&
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 export default function NovoAtendimento() {
   const router = useRouter();
-  const [historico, setHistorico] = useState([
-    { id: 1, queixa: 'Dor de cabeça constante', resposta: 'Recomendado repouso e hidratação', data: '01/04/2025' },
-    { id: 2, queixa: 'Sentindo-se cansado e sem energia', resposta: 'Sugerido exame de sangue', data: '05/04/2025' },
-    { id: 3, queixa: 'Insônia frequente', resposta: 'Evitar cafeína à noite', data: '10/04/2025' },
-    { id: 4, queixa: 'Ansiedade em situações sociais', resposta: 'Encaminhado para atendimento fraterno', data: '12/04/2025' },
-    { id: 5, queixa: 'Falta de apetite', resposta: 'Observar alimentação e retorno em 7 dias', data: '14/04/2025' },
-  ]);
-
+  const [historico, setHistorico] = useState([]);
   const [mostrarHistoricoCompleto, setMostrarHistoricoCompleto] = useState(false);
   const [novaQueixa, setNovaQueixa] = useState('');
   const [sala, setSala] = useState('');
   const [buscaPaciente, setBuscaPaciente] = useState('');
   const [sugestoes, setSugestoes] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
-
   const salas = ['Maca', 'Passe', 'Fraterno'];
-
 
   const buscarPacientes = async (texto) => {
     setBuscaPaciente(texto);
-  
     if (texto.length < 2) {
       setSugestoes([]);
       setHistorico([]);
       return;
     }
-  
     const colRef = collection(db, 'bzmpessoa');
     const q = query(colRef, where('nome', '>=', texto), where('nome', '<=', texto + '\uf8ff'));
-  
     try {
       const snapshot = await getDocs(q);
       const pacientes = snapshot.docs.map(doc => ({ id: doc.id, idPessoa: doc.data().idPessoa, ...doc.data() }));
@@ -49,56 +55,23 @@ export default function NovoAtendimento() {
       console.error('Erro ao buscar paciente:', error);
     }
   };
-  
-  // Função ao selecionar o paciente
+
   const selecionarPaciente = (paciente) => {
     setBuscaPaciente(paciente.nome);
     setSelecionado(paciente);
     setSugestoes([]);
-    buscarHistoricoDoPaciente(paciente.idPessoa); 
+    buscarHistoricoDoPaciente(paciente.idPessoa);
   };
-  
-
-
-  const handleSalvarAtendimento = () => {
-    if (!buscaPaciente.trim()) {
-      Alert.alert('Atenção', 'Por favor, preencha o nome da pessoa.');
-      return;
-    }
-
-    if (!novaQueixa.trim()) {
-      Alert.alert('Atenção', 'Por favor, preencha as informações.');
-      return;
-    }
-
-    if (!sala) {
-      Alert.alert('Atenção', 'Por favor, selecione uma sala.');
-      return;
-    }
-
-    console.log('Atendimento salvo', { buscaPaciente, novaQueixa, sala });
-    Alert.alert('Sucesso', 'Atendimento salvo com sucesso!');
-  };
-
-  const handleCadastrarPessoa = () => {
-    console.log('Abrir formulário de cadastro de nova pessoa');
-  };
-
 
   const buscarHistoricoDoPaciente = async (idPessoa) => {
-  
     try {
-      // Passo 1: Buscar o histórico utilizando o campo 'idPessoa'
       const colRef = collection(db, 'bzmAtendimentoHist');
-      const q = query(colRef, where('id_paciente', '==', idPessoa));
-      const snapshot = await getDocs(q);
-
+      const historicoQuery = query(colRef, where('id_paciente', '==', idPessoa));
+      const snapshot = await getDocs(historicoQuery);
   
       const historicoFormatado = snapshot.docs.map((doc, index) => {
         const dados = doc.data();
-  
         const dataFormatada = new Date(dados.data_hora?.seconds * 1000).toLocaleDateString('pt-BR');
-  
         return {
           id: index + 1,
           queixa: dados.queixa,
@@ -113,108 +86,160 @@ export default function NovoAtendimento() {
     }
   };
   
-
   
 
-
+  const handleSalvarAtendimento = async () => {
+    if (!buscaPaciente.trim() || !novaQueixa.trim() || !sala || !selecionado) {
+      Alert.alert('Atenção', 'Preencha todos os campos obrigatórios.');
+      return;
+    }
+  
+    try {
+      // Verifica se já existe um atendimento "Aguardando"
+      const colRef = collection(db, 'bzmAtendimentoHist');
+      const q = query(colRef, where('id_paciente', '==', selecionado.idPessoa), where('status', '==', 'aguardando'));
+      const snapshot = await getDocs(q);
+  
+      if (!snapshot.empty) {
+        Alert.alert('Atenção', 'Este paciente já possui um atendimento com status "aguardando".');
+        return;
+      }
+  
+      // Se não houver duplicidade, salva
+      const novoAtendimento = {
+        data_hora: Timestamp.now(),
+        id_paciente: selecionado.idPessoa,
+        orientacao_recebida: '',
+        orientador: '',
+        queixa: novaQueixa,
+        sala_atendida: sala,
+        status: 'aguardando',
+      };
+  
+      await addDoc(collection(db, 'bzmAtendimentoHist'), novoAtendimento);
+  
+      Alert.alert('Sucesso', 'Atendimento salvo com sucesso!');
+      setNovaQueixa('');
+      setSala('');
+      setSelecionado(null);
+      setBuscaPaciente('');
+      setHistorico([]);
+    } catch (error) {
+      console.error('Erro ao salvar atendimento:', error);
+      Alert.alert('Erro', 'Não foi possível salvar o atendimento.');
+    }
+  };
+  
+  
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Cadastrar Atendimento</Text>
-
-      <TouchableOpacity style={styles.botaoFixo} onPress={() => router.push('/Rota_CadastroPessoaScreen')}>
-        <Text style={styles.botaoTexto}>+ Nova Pessoa</Text>
-      </TouchableOpacity>
-
-      {/* Busca de paciente */}
-      <TextInput
-        style={styles.input}
-        placeholder="pesquise pelo nome ou data de nascimento"
-        value={buscaPaciente}
-        onChangeText={(text) => buscarPacientes(text)}
-      />
-
-      {sugestoes.length > 0 && (
-        <FlatList
-          data={sugestoes}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => selecionarPaciente(item)} style={styles.sugestaoItem}>
-              <Text>{item.nome}</Text>
+    <FlatList
+      data={[{}]} // valor fictício só para manter o FlatList vivo
+      keyExtractor={(_, index) => index.toString()}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={
+        <View style={styles.container}>
+          <View style={styles.topo}>
+            <MaterialIcons name="healing" size={26} color="#5A90E0" />
+            <Text style={styles.title}>Atendimento Espiritual</Text>
+          </View>
+  
+          <TextInput
+            style={styles.input}
+            placeholder="Pesquise pelo nome ou nascimento"
+            value={buscaPaciente}
+            onChangeText={buscarPacientes}
+          />
+  
+          {/* 🔁 Renderiza sugestões manualmente */}
+          {sugestoes.length > 0 && (
+            <View style={styles.listaSugestoes}>
+              {sugestoes.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  onPress={() => selecionarPaciente(item)}
+                  style={styles.sugestaoItem}
+                >
+                  <Text>{item.nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+  
+          {buscaPaciente.length > 2 && sugestoes.length === 0 && !selecionado && (
+            <TouchableOpacity
+              style={styles.botaoCadastroSugestao}
+              onPress={() => router.push('/Rota_CadastroPessoaScreen')}
+            >
+              <MaterialIcons name="person-add" size={20} color="#fff" />
+              <Text style={styles.textoCadastro}>Cadastrar nova pessoa</Text>
             </TouchableOpacity>
           )}
-          style={styles.listaSugestoes}
-        />
-      )}
-
-      {/* Nova queixa */}
-      <TextInput
-        style={[styles.input, styles.novaQueixa]}
-        placeholder="Informações..."
-        multiline
-        value={novaQueixa}
-        onChangeText={(text) => setNovaQueixa(text)}
-      />
-
-      {/* Histórico de queixas */}
-      <View style={styles.historicoContainer}>
-        <Text style={styles.subTitle}>Histórico</Text>
-        {(mostrarHistoricoCompleto ? historico : historico.slice(0, 2)).map((item) => (
-          <View key={item.id} style={styles.historicoItem}>
-            <Text style={styles.historicoText}>{item.queixa}</Text>
-            <Text style={styles.historicoData}>{item.data}</Text>
-            {item.resposta && (
-              <Text style={styles.respostaText}>{item.resposta}</Text>
+  
+          <TextInput
+            style={[styles.input, styles.novaQueixa]}
+            placeholder="Insira o motivo da sua visita hoje..."
+            multiline
+            value={novaQueixa}
+            onChangeText={setNovaQueixa}
+          />
+  
+          <View style={styles.historicoContainer}>
+            <Text style={styles.subTitle}>Histórico</Text>
+            {(mostrarHistoricoCompleto ? historico : historico.slice(0, 2)).map((item) => (
+              <View key={item.id} style={styles.historicoItem}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="history" size={18} color="#999" style={{ marginRight: 8 }} />
+                  <Text style={styles.historicoText}>{item.queixa}</Text>
+                </View>
+                <Text style={styles.historicoData}>{item.data}</Text>
+                {item.resposta && <Text style={styles.respostaText}>{item.resposta}</Text>}
+              </View>
+            ))}
+            {historico.length > 2 && (
+              <TouchableOpacity
+                onPress={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setMostrarHistoricoCompleto(!mostrarHistoricoCompleto);
+                }}>
+                <Text style={styles.verMais}>
+                  {mostrarHistoricoCompleto ? 'Ver menos' : 'Ver mais'}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
-        ))}
-
-        {historico.length > 2 && (
-          <TouchableOpacity onPress={() => setMostrarHistoricoCompleto(!mostrarHistoricoCompleto)}>
-            <Text style={styles.verMais}>
-              {mostrarHistoricoCompleto ? 'Ver menos' : 'Ver mais'}
-            </Text>
+  
+          <Text style={styles.subTitle}>Sala</Text>
+          <View style={styles.salaContainer}>
+            {salas.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.salaButton, sala === item && styles.salaButtonSelected]}
+                onPress={() => setSala(item)}>
+                <Text style={[styles.salaButtonText, sala === item && styles.salaButtonTextSelected]}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      }
+      renderItem={null} // 👈 não precisa renderizar itens reais
+      ListFooterComponent={
+        <View style={[styles.buttonContainer, { paddingHorizontal: width * 0.05, marginBottom: 40 }]}>
+          <TouchableOpacity style={styles.button} onPress={handleSalvarAtendimento}>
+            <Text style={styles.buttonText}>Salvar</Text>
           </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Seleção da sala */}
-      <View style={styles.salaContainer}>
-        <Text style={styles.subTitle}>Selecione a Sala</Text>
-        {salas.map((item, index) => (
           <TouchableOpacity
-            key={index}
-            style={[
-              styles.salaButton,
-              sala === item && styles.salaButtonSelected
-            ]}
-            onPress={() => setSala(item)}
-          >
-            <Text
-              style={[
-                styles.salaButtonText,
-                sala === item && styles.salaButtonTextSelected
-              ]}
-            >
-              {item}
-            </Text>
+            style={[styles.button, styles.cancelButton]}
+            onPress={() => router.back()}>
+            <Text style={styles.cancelButtonText}>Cancelar</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Botões */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={handleSalvarAtendimento}>
-          <Text style={styles.buttonText}>Salvar</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={() => console.log('Cancelando atendimento')}
-        >
-          <Text style={styles.cancelbuttonText}>Cancelar</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </View>
+      }
+    />
   );
+  
+  
 }
 
 const styles = StyleSheet.create({
@@ -224,140 +249,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: width * 0.05
   },
+  topo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: height * 0.03
+  },
   title: {
-    color: '#007AFF',
-    paddingHorizontal: width * 0.0000,
     fontSize: width * 0.055,
     fontWeight: 'bold',
-    textAlign: 'left',
-    marginVertical: height * 0.03
-  },
-  botaoFixo: {
-    position: 'absolute',
-    top: height * 0.13,  // Ajusta a distância da parte inferior da tela
-    right: width * 0.05,    // Ajusta a distância da borda direita
-    backgroundColor: '#007AFF', // Cor roxa semelhante ao Nubank
-    paddingVertical: height * 0.010,  // Espaçamento vertical para o botão
-    paddingHorizontal: width * 0.010,  // Espaçamento horizontal para o botão
-    borderRadius: 30,         // Arredondamento do botão
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5           // Sombra para o botão
-  },
-  botaoTexto: {
-    color: '#fff',   // Cor do texto dentro do botão
-    fontSize: width * 0.03,
-    fontWeight: 'bold'
+    color: '#5A90E0',
   },
   input: {
-    width: '100%',
-    height: 50, // altura maior
-    borderColor: '#ccc',
+    backgroundColor: '#f7f9fc',
     borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: height * 0.02,
-    paddingLeft: width * 0.04,
-    paddingVertical: 10 // espaçamento interno pra não cortar texto
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: height * 0.02
   },
   novaQueixa: {
-    height: height * 0.1,
+    height: height * 0.12,
     textAlignVertical: 'top'
-  },
-  historicoContainer: {
-    marginBottom: height * 0.03
-  },
-  subTitle: {
-    fontSize: width * 0.05,
-    fontWeight: 'bold',
-    marginBottom: height * 0.01
-  },
-  historicoItem: {
-    padding: width * 0.04,
-    backgroundColor: '#f0f0f0',
-    marginBottom: height * 0.01,
-    borderRadius: 5
-  },
-  historicoText: {
-    fontSize: width * 0.04,
-    color: '#333'
-  },
-  historicoData: {
-    fontSize: width * 0.033,
-    color: '#999',
-    marginTop: height * 0.004,
-    marginLeft: width * 0.01
-  },
-  respostaText: {
-    fontSize: width * 0.038,
-    color: '#666',
-    marginTop: height * 0.005,
-    marginLeft: width * 0.05,
-    fontStyle: 'italic'
-  },
-  verMais: {
-    color: '#007AFF',
-    fontSize: width * 0.04,
-    marginTop: height * 0.01,
-    textAlign: 'right'
-  },
-  salaContainer: {
-    marginBottom: height * 0.03
-  },
-  salaButton: {
-    padding: width * 0.05,
-    backgroundColor: 'rgba(7, 145, 209, 0.2)',
-    borderRadius: 5,
-    marginBottom: height * 0.015
-  },
-  salaButtonSelected: {
-    padding: width * 0.05,
-    backgroundColor: 'rgba(7, 145, 209, 0.2)',
-    borderRadius: 8,
-    marginBottom: height * 0.015,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  salaButtonText: {
-    color: '#000',
-    fontSize: width * 0.045
-  },
-  salaButtonTextSelected: {
-    fontWeight: 'bold'
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between'
-  },
-  button: {
-    flex: 1,
-    backgroundColor: 'rgba(240, 245, 245, 0.2)',
-    padding: height * 0.015,
-    borderRadius: 5,
-    marginHorizontal: width * 0.02,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  cancelButton: {
-    backgroundColor: 'rgba(240, 245, 245, 0.2)',
-    borderColor: '#F5A3A3',
-    justifyContent: 'center',
-    borderWidth: 1
-  },
-  buttonText: {
-    color: '#007AFF',
-    fontSize: width * 0.045,
-    fontWeight: 'bold'
-  },
-  cancelbuttonText: {
-    color: '#F5A3A3',
-    fontSize: width * 0.045,
-    fontWeight: 'bold'
   },
   sugestaoItem: {
     paddingVertical: 10,
@@ -373,5 +286,111 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 5,
     marginBottom: 15
+  },
+  historicoContainer: {
+    marginBottom: height * 0.03
+  },
+  subTitle: {
+    fontSize: width * 0.045,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8
+  },
+  historicoItem: {
+    padding: width * 0.04,
+    backgroundColor: '#f0f0f0',
+    marginBottom: height * 0.015,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  historicoText: {
+    fontSize: width * 0.04,
+    color: '#333'
+  },
+  historicoData: {
+    fontSize: width * 0.033,
+    color: '#888',
+    marginTop: 4
+  },
+  respostaText: {
+    fontSize: width * 0.037,
+    color: '#555',
+    fontStyle: 'italic',
+    marginTop: 4
+  },
+  verMais: {
+    color: '#5A90E0',
+    fontSize: width * 0.04,
+    marginTop: height * 0.01,
+    textAlign: 'right'
+  },
+  salaContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: height * 0.03
+  },
+  salaButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 20
+  },
+  salaButtonSelected: {
+    backgroundColor: '#5A90E0',
+  },
+  salaButtonText: {
+    fontSize: width * 0.04,
+    color: '#5A90E0'
+  },
+  salaButtonTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold'
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: height * 0.02
+  },
+  button: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#5A90E0',
+    marginHorizontal: 5,
+    alignItems: 'center'
+  },
+  cancelButton: {
+    borderColor: '#DC5C5C',
+  },
+  buttonText: {
+    fontWeight: 'bold',
+    fontSize: width * 0.045,
+    color: '#5A90E0'
+  },
+  botaoCadastroSugestao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#5A90E0', // Azul suave
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10
+  },
+  textoCadastro: {
+    color: '#fff',
+    fontSize: width * 0.04,
+    fontWeight: 'bold',
+    marginLeft: 8
+  },
+  cancelButtonText: {
+    fontWeight: 'bold',
+    fontSize: width * 0.045,
+    color: '#DC5C5C'
   }
 });
