@@ -90,6 +90,8 @@ const WaitingQueue = () => {
   const [animatingCardId, setAnimatingCardId] = useState(null);
   const animation = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+
 
 
   const onRefresh = async () => {
@@ -477,18 +479,42 @@ const WaitingQueue = () => {
       />
 
       <Text style={{ marginTop: 12, marginBottom: 6 }}>Orientador:</Text>
+
+      <TouchableOpacity
+  style={styles.dropdownButton}
+  onPress={() => setShowDropdown(true)}
+>
+  <Text style={styles.dropdownButtonText}>
+    {orientadorSelecionado ? `👤 ${orientadorSelecionado}` : 'Selecionar Orientador'}
+  </Text>
+</TouchableOpacity>
+
+
+<Modal
+  visible={showDropdown}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setShowDropdown(false)}
+>
+  <View style={styles.dropdownOverlay}>
+    <View style={styles.dropdownContainer}>
+      <Text style={styles.modalTitle}>Escolha o orientador</Text>
       {voluntariosMock.map((nome) => (
         <TouchableOpacity
           key={nome}
-          style={[
-            styles.salaOptionButton,
-            orientadorSelecionado === nome && { backgroundColor: '#d0e7ff' },
-          ]}
-          onPress={() => setOrientadorSelecionado(nome)}
+          onPress={() => {
+            setOrientadorSelecionado(nome);
+            setShowDropdown(false);
+          }}
+          style={styles.dropdownOption}
         >
-          <Text style={styles.salaOptionText}>{nome}</Text>
+          <Text style={styles.dropdownOptionText}>👤 {nome}</Text>
         </TouchableOpacity>
       ))}
+    </View>
+  </View>
+</Modal>
+
 
       <View style={{ flexDirection: 'row', marginTop: 20, gap: 10 }}>
         <TouchableOpacity
@@ -728,7 +754,49 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   
+  dropdownButton: {
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 10,
+  },
   
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  dropdownContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: height * 0.5,
+  },
+  
+  dropdownOption: {
+    paddingVertical: 12,
+    borderBottomColor: '#ccc',
+    borderBottomWidth: 1,
+  },
+  
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  
+
 });
 
 export default WaitingQueue;

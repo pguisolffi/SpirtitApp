@@ -29,11 +29,11 @@ export default function CadastroPessoaScreen() {
 
     try {
       await addDoc(collection(db, 'bzmpessoa'), {
-        nome,
-        email,
-        telefone,
-        dataNascimento,
-        endereco,
+        nome: nome.trim().toUpperCase(),
+        email: email.toLowerCase().trim(),
+        telefone: telefone.replace(/\D/g, ''),
+        dataNascimento: dataNascimento.trim(),
+        endereco: endereco.trim(),
         idPessoa: Date.now(),
         criadoEm: new Date(),
       });

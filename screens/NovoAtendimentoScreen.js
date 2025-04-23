@@ -45,8 +45,15 @@ export default function NovoAtendimento() {
       setHistorico([]);
       return;
     }
+  
     const colRef = collection(db, 'bzmpessoa');
-    const q = query(colRef, where('nome', '>=', texto), where('nome', '<=', texto + '\uf8ff'));
+    const nomeNormalizado = texto.trim().toUpperCase(); // 🔥 aqui!
+    const q = query(
+      colRef,
+      where('nome', '>=', nomeNormalizado),
+      where('nome', '<=', nomeNormalizado + '\uf8ff')
+    );
+  
     try {
       const snapshot = await getDocs(q);
       const pacientes = snapshot.docs.map(doc => ({ id: doc.id, idPessoa: doc.data().idPessoa, ...doc.data() }));
@@ -55,6 +62,7 @@ export default function NovoAtendimento() {
       console.error('Erro ao buscar paciente:', error);
     }
   };
+  
 
   const selecionarPaciente = (paciente) => {
     setBuscaPaciente(paciente.nome);
