@@ -1,7 +1,5 @@
-// LoginScreen.js - Versão moderna com fundo, animação leve e login com Google
-
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -15,6 +13,7 @@ import Input from '../components/input';
 import { auth } from './firebaseConfig';
 import { AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import LottieView from 'lottie-react-native'; // << Adicionado aqui
 
 const { width, height } = Dimensions.get('window');
 WebBrowser.maybeCompleteAuthSession();
@@ -23,41 +22,38 @@ export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [loading, setLoading] = useState(false); // << Novo estado para controlar animação
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    expoClientId: '977109605765-coqhqmns0gknb6tg6rpomlpt548gfkhj.apps.googleusercontent.com',
-    webClientId: '977109605765-coqhqmns0gknb6tg6rpomlpt548gfkhj.apps.googleusercontent.com',
-    androidClientId: '977109605765-2jjc9p8k769vgvjel8o90i34h02oqbrj.apps.googleusercontent.com',
-    iosClientId: '977109605765-p9450eft6akfo9mgbke5p1d7s45ru80g.apps.googleusercontent.com',
+    expoClientId: 'SEUS_CLIENT_IDS_AQUI',
+    webClientId: 'SEUS_CLIENT_IDS_AQUI',
+    androidClientId: 'SEUS_CLIENT_IDS_AQUI',
+    iosClientId: 'SEUS_CLIENT_IDS_AQUI',
     redirectUri: 'https://auth.expo.io/@pguisolffi/SpiritApp',
     useProxy: true,
   });
 
-
   useEffect(() => {
     if (response?.type === 'success' && response.params?.id_token) {
       const { id_token } = response.params;
-
-      console.log('✅ ID Token recebido:', id_token);
-
       const credential = GoogleAuthProvider.credential(id_token);
+
+      setLoading(true);
       signInWithCredential(auth, credential)
         .then(() => {
-          console.log('🎉 Autenticado no Firebase com sucesso!');
           Alert.alert('Bem-vindo!');
           router.push('/Rota_HomeFuncionario');
         })
         .catch((err) => {
-          console.error('❌ Erro ao autenticar no Firebase:', err);
+          console.error('Erro ao autenticar no Firebase:', err);
           Alert.alert('Erro', 'Falha ao autenticar com Google.');
-        });
-    } else if (response?.type === 'success' && !response.params?.id_token) {
-      console.warn('⚠️ Login Google bem-sucedido, mas sem id_token. Verifique escopos e OAuth consent screen.');
+        })
+        .finally(() => setLoading(false)); // Para a animação
     } else if (response?.type === 'error') {
-      console.error('❌ Erro na resposta OAuth do Google:', response);
+      console.error('Erro na resposta OAuth do Google:', response);
+      setLoading(false);
     }
   }, [response]);
-
 
   const handleLogin = async () => {
     if (!email || !senha) {
@@ -66,59 +62,75 @@ export default function LoginScreen() {
     }
 
     try {
+      setLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, senha);
       router.push('/Rota_HomeFuncionario');
     } catch (error) {
       console.error('Erro ao logar:', error);
       Alert.alert('Erro', 'Email ou senha inválidos.');
+    } finally {
+      setLoading(false); // Para a animação
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-    <LinearGradient colors={['#e0f7fa', '#ffffff']} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-        <Animatable.Image
-          animation="fadeInDown"
-          source={require('../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        {/*bar do celular*/}
-        {/*<StatusBar style="dark" hidden />*/}
+      <LinearGradient colors={['#e0f7fa', '#ffffff']} style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          {!loading && (
+            <Animatable.Image
+              animation="fadeInDown"
+              source={require('../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          )} 
 
-        <Animatable.View animation="fadeInUp" style={styles.formBox}>
-          <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-          <Input placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} />
 
-          <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginText}>Entrar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.googleBtn} onPress={() => {
-            promptAsync();
-          }}>
-            <View style={styles.googleContent}>
-              <AntDesign name="google" size={20} color="#4285F4" />
-              <Text style={styles.googleText}>Entrar com Google</Text>
+          {/* Se estiver carregando, mostra a animação */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <LottieView
+                source={require('../assets/birds.json')} // precisa de uma animação lottie de pássaros
+                autoPlay
+                loop
+                style={{ width: 200, height: 200 }}
+              />
+              <Text style={{ marginTop: 20, fontSize: 16, color: '#555' }}>Aguarde...</Text>
             </View>
-          </TouchableOpacity>
+          )}
 
+          {!loading && (
+            <Animatable.View animation="fadeInUp" style={styles.formBox}>
+              <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+              <Input placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} />
 
-          <TouchableOpacity onPress={() => router.push('/cadastroUsuarioScreen')}>
-            <Text style={styles.register}>Cadastre-se</Text>
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
+                <Text style={styles.loginText}>Entrar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.googleBtn} onPress={() => promptAsync()}>
+                <View style={styles.googleContent}>
+                  <AntDesign name="google" size={20} color="#4285F4" />
+                  <Text style={styles.googleText}>Entrar com Google</Text>
+                </View>
+              </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.push('/Rota_RecuperarSenhaScreen')}>
-            <Text style={styles.forgot}>Esqueceu a senha?</Text>
-          </TouchableOpacity>
-        </Animatable.View>
+              <TouchableOpacity onPress={() => router.push('/cadastroUsuarioScreen')}>
+                <Text style={styles.register}>Cadastre-se</Text>
+              </TouchableOpacity>
 
-        <Text style={styles.footer}>© 2025 - Fraternidade Bezerra de Menezes</Text>
-      </ScrollView>
-    </LinearGradient>
+              <TouchableOpacity onPress={() => router.push('/Rota_RecuperarSenhaScreen')}>
+                <Text style={styles.forgot}>Esqueceu a senha?</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+          )}
+          {!loading && (
+          <Text style={styles.footer}>© 2025 - Fraternidade Bezerra de Menezes</Text>
+          )}
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
-
 }
 
 const styles = StyleSheet.create({
@@ -193,5 +205,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     color: '#888',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
   },
 });
