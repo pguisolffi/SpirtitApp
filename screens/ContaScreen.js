@@ -80,7 +80,6 @@ export default function ContaScreen() {
     return dataFormatada;
   };
 
-
   const validarDataNascimento = (data) => {
     if (!data || data.length !== 10) return false; // Precisa ter 10 caracteres DD/MM/AAAA
 
@@ -95,8 +94,6 @@ export default function ContaScreen() {
       dataObj.getDate() === dia
     );
   };
-
-
 
   if (!usuario) {
     return (

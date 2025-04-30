@@ -65,7 +65,7 @@ export default function CadastroScreen({ navigation }) {
         nome,
         email,
         telefone,
-        perfil: 'Administrador',
+        perfil: 'ADMINISTRADOR',
         permissoes: 'Todas',
         endereco: 'Endereço não informado',
         idUsuario: Date.now(),

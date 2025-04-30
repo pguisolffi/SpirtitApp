@@ -353,10 +353,10 @@ const WaitingQueue = () => {
             // Junta os que não mudaram + os reordenados da sala atual
             return [...foraDaSala, ...data];
           });
+
+        }}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        }}
-        
       />
      
 

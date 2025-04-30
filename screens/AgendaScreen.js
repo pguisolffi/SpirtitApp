@@ -1,88 +1,220 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,Dimensions, StyleSheet, Modal
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+  StyleSheet,
+  Modal,
+  Alert,
 } from "react-native";
 import CalendarPicker from "react-native-calendar-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { auth } from "./firebaseConfig"; // Certifique-se de importar corretamente
+import {
+  collection,
+  doc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDoc,
+  query,
+  where,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "./firebaseConfig";
 
 const { width, height } = Dimensions.get("window");
 
 export default function Agenda() {
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
-  const [eventos, setEventos] = useState({
-    "2025-04-13": [
-      {
-        titulo: "Meditação Guiada",
-        hora: "10:00",
-        local: "Sala 1",
-        descricao: "Sessão de meditação para iniciantes.",
-      },
-    ],
-  });
-
+  const [eventos, setEventos] = useState({});
   const [novoEvento, setNovoEvento] = useState({
-    titulo: "", hora: "", local: "", descricao: ""
+    titulo: "",
+    hora: "",
+    local: "",
+    descricao: "",
   });
-
   const [formVisivel, setFormVisivel] = useState(false);
   const [eventoSelecionado, setEventoSelecionado] = useState(null);
   const [modalAberta, setModalAberta] = useState(false);
   const [editando, setEditando] = useState(false);
   const [participacoes, setParticipacoes] = useState({});
+  const [usuario, setUsuario] = useState(null);
+  const [usuarioAutorizado, setUsuarioAutorizado] = useState(false);
 
-  const usuarioAutorizado = true; // define a regra depois
   const dataChave = format(dataSelecionada, "yyyy-MM-dd");
-  const eventosDoDia = eventos[dataChave] || [];
 
-  const salvarNovoEvento = () => {
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        setUsuario(user);
+        console.log("Usuário autenticado:", user.uid);
+        buscarPerfilUsuario(); // 👈 chamada única aqui
+      } else {
+        setUsuario(null);
+        setUsuarioAutorizado(false);
+      }
+    });
+  
+    return () => unsubscribe();
+  }, []);
+  
+
+
+  const buscarPerfilUsuario = async () => {
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const q = query(collection(db, "bzmusuario"), where("uid", "==", user.uid));
+        const querySnapshot = await getDocs(q);
+  
+        if (!querySnapshot.empty) {
+          const dados = querySnapshot.docs[0].data();
+          const perfil = dados.perfil || "";
+  
+          console.log("Perfil encontrado:", perfil);
+  
+          const perfis = perfil.split(",").map((p) => p.trim().toUpperCase());
+          const isAdmin = perfis.includes("ADMINISTRADOR");
+  
+          setUsuarioAutorizado(isAdmin);
+        } else {
+          console.warn("Usuário não encontrado na coleção bzmusuario");
+          setUsuarioAutorizado(false);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar perfil do usuário:", error);
+      setUsuarioAutorizado(false);
+    }
+  };
+  
+  
+
+  useEffect(() => {
+    const q = query(collection(db, "bzmagenda"), where("data", "==", dataChave));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const eventosDoDia = [];
+      querySnapshot.forEach((doc) => {
+        eventosDoDia.push({ id: doc.id, ...doc.data() });
+      });
+      setEventos((prev) => ({ ...prev, [dataChave]: eventosDoDia }));
+    });
+
+    return () => unsubscribe();
+  }, [dataChave]);
+
+  const salvarNovoEvento = async () => {
     const { titulo, hora, local, descricao } = novoEvento;
     if (!titulo || !hora || !local) return;
 
-    setEventos((prev) => ({
-      ...prev,
-      [dataChave]: [...eventosDoDia, novoEvento],
-    }));
-
-    setNovoEvento({ titulo: "", hora: "", local: "", descricao: "" });
-    setFormVisivel(false);
+    try {
+      await addDoc(collection(db, "bzmagenda"), {
+        data: dataChave,
+        titulo,
+        hora,
+        local,
+        descricao,
+        usuarioCriacao: usuario.uid,
+      });
+      setNovoEvento({ titulo: "", hora: "", local: "", descricao: "" });
+      setFormVisivel(false);
+    } catch (error) {
+      console.error("Erro ao salvar evento:", error);
+    }
   };
 
-  const abrirDetalhesEvento = (evento, index) => {
-    setEventoSelecionado({ ...evento, index });
+  const abrirDetalhesEvento = async (evento) => {
+    setEventoSelecionado(evento);
     setModalAberta(true);
     setEditando(false);
-  };
 
-  const salvarEdicao = () => {
-    const novosEventos = [...eventosDoDia];
-    novosEventos[eventoSelecionado.index] = {
-      titulo: eventoSelecionado.titulo,
-      hora: eventoSelecionado.hora,
-      local: eventoSelecionado.local,
-      descricao: eventoSelecionado.descricao,
-    };
-
-    setEventos((prev) => ({
-      ...prev,
-      [dataChave]: novosEventos,
-    }));
-
-    setEditando(false);
-    setModalAberta(false);
-  };
-
-  const toggleParticipacao = () => {
-    const key = `${dataChave}_${eventoSelecionado.index}`;
+    // Verificar se o usuário já está participando
+    const q = query(
+      collection(db, "bzmParticipacaoAgenda"),
+      where("idAgenda", "==", evento.id),
+      where("idUsuario", "==", usuario.uid)
+    );
+    const querySnapshot = await getDocs(q);
     setParticipacoes((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [evento.id]: !querySnapshot.empty,
     }));
   };
 
-  const estaParticipando = eventoSelecionado
-    ? participacoes[`${dataChave}_${eventoSelecionado.index}`]
-    : false;
+  const salvarEdicao = async () => {
+    const { id, titulo, hora, local, descricao } = eventoSelecionado;
+    try {
+      await updateDoc(doc(db, "bzmagenda", id), {
+        titulo,
+        hora,
+        local,
+        descricao,
+      });
+      setEditando(false);
+      setModalAberta(false);
+    } catch (error) {
+      console.error("Erro ao editar evento:", error);
+    }
+  };
+
+  const excluirEvento = async () => {
+    Alert.alert("Confirmação", "Deseja excluir este evento?", [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(db, "bzmagenda", eventoSelecionado.id));
+            setModalAberta(false);
+          } catch (error) {
+            console.error("Erro ao excluir evento:", error);
+          }
+        },
+      },
+    ]);
+  };
+
+  const toggleParticipacao = async () => {
+    const participando = participacoes[eventoSelecionado.id];
+    try {
+      if (participando) {
+        // Remover participação
+        const q = query(
+          collection(db, "bzmParticipacaoAgenda"),
+          where("idAgenda", "==", eventoSelecionado.id),
+          where("idUsuario", "==", usuario.uid)
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach(async (docSnap) => {
+          await deleteDoc(doc(db, "bzmParticipacaoAgenda", docSnap.id));
+        });
+      } else {
+        // Adicionar participação
+        await addDoc(collection(db, "bzmParticipacaoAgenda"), {
+          idAgenda: eventoSelecionado.id,
+          idUsuario: usuario.uid,
+        });
+      }
+      setParticipacoes((prev) => ({
+        ...prev,
+        [eventoSelecionado.id]: !participando,
+      }));
+    } catch (error) {
+      console.error("Erro ao atualizar participação:", error);
+    }
+  };
+
+  const eventosDoDia = eventos[dataChave] || [];
 
   return (
     <ScrollView style={styles.container}>
@@ -92,9 +224,14 @@ export default function Agenda() {
         <Text style={styles.subtitulo}>
           Eventos em {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
         </Text>
-        <TouchableOpacity style={styles.botaoNovo} onPress={() => setFormVisivel(!formVisivel)}>
-          <Text style={styles.botaoTexto}>+ Novo Evento</Text>
-        </TouchableOpacity>
+        {usuarioAutorizado && (
+          <TouchableOpacity
+            style={styles.botaoNovo}
+            onPress={() => setFormVisivel(!formVisivel)}
+          >
+            <Text style={styles.botaoTexto}>+ Novo Evento</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {formVisivel && (
@@ -103,19 +240,25 @@ export default function Agenda() {
             style={styles.input}
             placeholder="Título"
             value={novoEvento.titulo}
-            onChangeText={(text) => setNovoEvento({ ...novoEvento, titulo: text })}
+            onChangeText={(text) =>
+              setNovoEvento({ ...novoEvento, titulo: text })
+            }
           />
           <TextInput
             style={styles.input}
             placeholder="Hora (ex: 14:00)"
             value={novoEvento.hora}
-            onChangeText={(text) => setNovoEvento({ ...novoEvento, hora: text })}
+            onChangeText={(text) =>
+              setNovoEvento({ ...novoEvento, hora: text })
+            }
           />
           <TextInput
             style={styles.input}
             placeholder="Local"
             value={novoEvento.local}
-            onChangeText={(text) => setNovoEvento({ ...novoEvento, local: text })}
+            onChangeText={(text) =>
+              setNovoEvento({ ...novoEvento, local: text })
+            }
           />
           <TextInput
             style={[styles.input, styles.textarea]}
@@ -123,9 +266,14 @@ export default function Agenda() {
             multiline
             numberOfLines={3}
             value={novoEvento.descricao}
-            onChangeText={(text) => setNovoEvento({ ...novoEvento, descricao: text })}
+            onChangeText={(text) =>
+              setNovoEvento({ ...novoEvento, descricao: text })
+            }
           />
-          <TouchableOpacity style={styles.botaoSalvar} onPress={salvarNovoEvento}>
+          <TouchableOpacity
+            style={styles.botaoSalvar}
+            onPress={salvarNovoEvento}
+          >
             <Text style={styles.botaoTexto}>Salvar Evento</Text>
           </TouchableOpacity>
         </View>
@@ -137,8 +285,18 @@ export default function Agenda() {
         locale="pt"
         weekdays={["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]}
         months={[
-          "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+          "Janeiro",
+          "Fevereiro",
+          "Março",
+          "Abril",
+          "Maio",
+          "Junho",
+          "Julho",
+          "Agosto",
+          "Setembro",
+          "Outubro",
+          "Novembro",
+          "Dezembro",
         ]}
         todayBackgroundColor="#f2f2f2"
         selectedDayColor="#4f46e5"
@@ -149,104 +307,139 @@ export default function Agenda() {
         {eventosDoDia.length === 0 ? (
           <Text style={styles.semEvento}>Nenhum evento para este dia.</Text>
         ) : (
-          eventosDoDia.map((evento, index) => (
+          eventosDoDia.map((evento) => (
             <TouchableOpacity
-              key={index}
+              key={evento.id}
               style={styles.cartaoEvento}
-              onPress={() => abrirDetalhesEvento(evento, index)}
+              onPress={() => abrirDetalhesEvento(evento)}
             >
               <Text style={styles.eventoTitulo}>{evento.titulo}</Text>
-              <Text style={styles.eventoInfo}>{evento.hora} - {evento.local}</Text>
+              <Text style={styles.eventoInfo}>
+                {evento.hora} - {evento.local}
+              </Text>
             </TouchableOpacity>
           ))
         )}
       </View>
 
-      <Modal visible={modalAberta} animationType="slide" transparent={true}>
+      <Modal visible={modalAberta} animationType="slide" transparent>
         <View style={styles.modalFundo}>
           <View style={styles.modalConteudo}>
-            {eventoSelecionado && (
-              <>
-                {editando ? (
-                  <>
-                    <TextInput
-                      style={styles.input}
-                      value={eventoSelecionado.titulo}
-                      onChangeText={(text) =>
-                        setEventoSelecionado({ ...eventoSelecionado, titulo: text })
-                      }
-                    />
-                    <TextInput
-                      style={styles.input}
-                      value={eventoSelecionado.hora}
-                      onChangeText={(text) =>
-                        setEventoSelecionado({ ...eventoSelecionado, hora: text })
-                      }
-                    />
-                    <TextInput
-                      style={styles.input}
-                      value={eventoSelecionado.local}
-                      onChangeText={(text) =>
-                        setEventoSelecionado({ ...eventoSelecionado, local: text })
-                      }
-                    />
-                    <TextInput
-                      style={[styles.input, styles.textarea]}
-                      value={eventoSelecionado.descricao}
-                      multiline
-                      onChangeText={(text) =>
-                        setEventoSelecionado({ ...eventoSelecionado, descricao: text })
-                      }
-                    />
-                    <TouchableOpacity style={styles.botaoSalvar} onPress={salvarEdicao}>
-                      <Text style={styles.botaoTexto}>Salvar Alterações</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.eventoTitulo}>{eventoSelecionado.titulo}</Text>
-                    <Text style={styles.eventoInfo}>
-                      {eventoSelecionado.hora} - {eventoSelecionado.local}
-                    </Text>
-                    <Text style={styles.eventoDescricao}>{eventoSelecionado.descricao}</Text>
+          {eventoSelecionado && (
+  <>
+    {editando ? (
+      <>
+        <TextInput
+          style={styles.input}
+          value={eventoSelecionado.titulo}
+          onChangeText={(text) =>
+            setEventoSelecionado({ ...eventoSelecionado, titulo: text })
+          }
+        />
+        <TextInput
+          style={styles.input}
+          value={eventoSelecionado.hora}
+          onChangeText={(text) =>
+            setEventoSelecionado({ ...eventoSelecionado, hora: text })
+          }
+        />
+        <TextInput
+          style={styles.input}
+          value={eventoSelecionado.local}
+          onChangeText={(text) =>
+            setEventoSelecionado({ ...eventoSelecionado, local: text })
+          }
+        />
+        <TextInput
+          style={[styles.input, styles.textarea]}
+          value={eventoSelecionado.descricao}
+          multiline
+          onChangeText={(text) =>
+            setEventoSelecionado({ ...eventoSelecionado, descricao: text })
+          }
+        />
+        <TouchableOpacity style={styles.botaoSalvar} onPress={salvarEdicao}>
+          <Text style={styles.botaoTexto}>Salvar Alterações</Text>
+        </TouchableOpacity>
+      </>
+    ) : (
+      <>
+        <Text style={styles.eventoTitulo}>{eventoSelecionado.titulo}</Text>
+        <Text style={styles.eventoInfo}>
+          {eventoSelecionado.hora} - {eventoSelecionado.local}
+        </Text>
+        <Text style={styles.eventoDescricao}>
+          {eventoSelecionado.descricao}
+        </Text>
 
-                    {usuarioAutorizado && (
-                      <>
-                        <TouchableOpacity
-                          style={styles.botaoEditar}
-                          onPress={() => setEditando(true)}
-                        >
-                          <Text style={styles.botaoTexto}>Editar</Text>
-                        </TouchableOpacity>
+        {/* Botão Participar */}
+        <TouchableOpacity
+          style={[
+            styles.botaoSalvar,
+            {
+              marginTop: 10,
+              backgroundColor: participacoes?.[eventoSelecionado.id]
+                ? "#dc2626"
+                : "#16a34a",
+            },
+          ]}
+          onPress={toggleParticipacao}
+        >
+          <Text style={styles.botaoTexto}>
+            {participacoes?.[eventoSelecionado.id]
+              ? "Remover participação"
+              : "Participar como voluntário"}
+          </Text>
+        </TouchableOpacity>
 
-                        <TouchableOpacity
-                        style={[
-                            styles.botaoSalvar,
-                            {
-                            marginTop: 10,
-                            backgroundColor: estaParticipando ? "#dc2626" : "#16a34a", // vermelho ou verde
-                            },
-                        ]}
-                        onPress={toggleParticipacao}
-                        >
-                        <Text style={styles.botaoTexto}>
-                            {estaParticipando
-                            ? "Remover participação"
-                            : "Participar como voluntário"}
-                        </Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </>
-                )}
-                <TouchableOpacity
-                  style={[styles.botaoCancelar, { marginTop: 10 }]}
-                  onPress={() => setModalAberta(false)}
-                >
-                  <Text style={[styles.botaoTexto, { color: "#111" }]}>Fechar</Text>
-                </TouchableOpacity>
-              </>
-            )}
+        {/* Apenas se admin */}
+        {usuarioAutorizado && (
+  <>
+    <TouchableOpacity style={styles.botaoEditar} onPress={() => setEditando(true)}>
+      <Text style={styles.botaoTexto}>Editar</Text>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[styles.botaoCancelar, { marginTop: 10 }]}
+      onPress={async () => {
+        Alert.alert(
+          "Excluir evento",
+          "Deseja realmente excluir este evento?",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Excluir",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await deleteDoc(doc(db, "bzmagenda", eventoSelecionado.id));
+                  setModalAberta(false);
+                } catch (error) {
+                  Alert.alert("Erro", "Não foi possível excluir.");
+                  console.error("Erro ao excluir:", error);
+                }
+              },
+            },
+          ]
+        );
+      }}
+    >
+      <Text style={[styles.botaoTexto, { color: "#dc2626" }]}>Excluir</Text>
+    </TouchableOpacity>
+  </>
+)}
+
+      </>
+    )}
+    <TouchableOpacity
+      style={[styles.botaoCancelar, { marginTop: 10 }]}
+      onPress={() => setModalAberta(false)}
+    >
+      <Text style={[styles.botaoTexto, { color: "#111" }]}>Fechar</Text>
+    </TouchableOpacity>
+  </>
+)}
+
           </View>
         </View>
       </Modal>
@@ -276,3 +469,5 @@ const styles = StyleSheet.create({
   modalFundo: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" },
   modalConteudo: { backgroundColor: "#fff", padding: 20, borderRadius: 10, width: "90%" },
 });
+
+ 

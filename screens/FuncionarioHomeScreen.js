@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Image,
   FlatList,
   Animated,
 } from 'react-native';
@@ -21,7 +22,7 @@ const menuItems = [
   { label: 'Novo Atendimento', icon: 'person-add-outline', route: '/Rota_NovoAtendimento' },
   { label: 'Fila de Espera', icon: 'people-outline', route: '/Rota_FilaDeEsperaScreen' },
   { label: 'Próximos Eventos', icon: 'calendar-outline', route: '/Rota_AgendaScreen' },
-  { label: 'Voluntários', icon: 'list-circle-outline', route: '/Rota_EscalaVoluntarios' },
+  { label: 'Escala de Voluntários', icon: 'list-circle-outline', route: '/Rota_EscalaVoluntarios' },
   { label: 'Biblioteca', icon: 'library-outline', route: '/Rota_Livros' },
   { label: 'Orações', icon: 'heart-outline', route: '/Rota_OracoesScreen'},
   { label: 'Cursos e Palestras', icon: 'book-outline', route: '/Rota_CursosPalestrasScreen' },
@@ -31,6 +32,7 @@ const menuItems = [
 const drawerItems = [
   { label: 'Conta', icon: 'person-outline', action: 'conta' },
   { label: 'Usuários', icon: 'people', action: 'configuracoes' },
+  { label: 'Pessoas', icon: 'person', action: 'pessoas' },
   { label: 'Sair', icon: 'log-out-outline', action: 'sair' },
 ];
 
@@ -120,6 +122,8 @@ export default function HomeFuncionario() {
       router.push('/Rota_ContaScreen');
     } else if (action === 'configuracoes') {
       router.push('/Rota_GerenciarUsuariosScreen');
+    } else if (action === 'pessoas') {
+      router.push('/Rota_GerenciarPessoaScreen');
     }
   };
   
@@ -134,19 +138,37 @@ export default function HomeFuncionario() {
       {/* Drawer lateral */}
       {drawerOpen && (
         <TouchableOpacity style={styles.overlay} onPress={closeDrawer} activeOpacity={1}>
-          <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
-            {drawerItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.drawerItem}
-                onPress={() => handleDrawerItemPress(item.action)}
-              >
-                <Ionicons name={item.icon} size={24} color="#333" />
-                <Text style={styles.drawerText}>{item.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
-        </TouchableOpacity>
+  <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
+    
+
+    <View style={styles.logoContainer}>
+      <Image
+        source={require('../assets/logo.png')}  // ajuste o caminho da sua logo
+        style={styles.logo}
+        resizeMode="contain"
+      />
+    </View>
+
+    {/* 🔥 MENUS ABAIXO */}
+    {drawerItems.map((item, index) => (
+  <TouchableOpacity
+    key={index}
+    style={styles.drawerItemContainer}
+    onPress={() => handleDrawerItemPress(item.action)}
+    activeOpacity={0.7}
+  >
+    <View style={styles.drawerItem}>
+      <View style={styles.iconCircle}>
+        <Ionicons name={item.icon} size={20} color="#6A5ACD" />
+      </View>
+      <Text style={styles.drawerText}>{item.label}</Text>
+    </View>
+  </TouchableOpacity>
+))}
+
+  </Animated.View>
+</TouchableOpacity>
+
       )}
   
       {/* Conteúdo da Home */}
@@ -169,7 +191,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f2f4f8',
-    paddingTop: height * 0.05, // Aproximadamente 4% da altura — bem mais perto do topo
+    paddingTop: height * 0.05, 
     paddingHorizontal: width * 0.04,
   }, 
   menuButton: {
@@ -189,7 +211,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: width * 0.6,
-    backgroundColor: '#fff',
+    backgroundColor: '#eef2ff',
     paddingTop: 60,
     paddingHorizontal: 20,
     zIndex: 30,
@@ -244,4 +266,44 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: height * 0.03,
+  },
+  logo: {
+    width: width * 0.4,
+    height: width * 0.4,
+  },
+  drawerItemContainer: {
+    backgroundColor: '#f5f5f5',
+    marginBottom: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 2, // Sombra leve no Android
+    shadowColor: '#000', // Sombra leve no iOS
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: height * 0.008,
+    paddingHorizontal: 15,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E0E0F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawerText: {
+    fontSize: 16,
+    marginLeft: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  
 });
