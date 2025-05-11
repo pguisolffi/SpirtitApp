@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,50 +11,174 @@ import {
   Platform,
 } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
+import { db } from "./firebaseConfig";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 
 const { width, height } = Dimensions.get("window");
 
-// Ativando animações no Android
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental &&
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const dadosVoluntarios = [
-  {
-    id: 1,
-    nome: "João da Silva",
-    eventos: [
-      { eventoId: 101, nomeEvento: "Distribuição de Cestas Básicas", data: "2025-04-13" },
-      { eventoId: 102, nomeEvento: "Bazar Solidário", data: "2025-04-14" },
-    ],
-  },
-  {
-    id: 2,
-    nome: "Maria Costa",
-    eventos: [
-      { eventoId: 101, nomeEvento: "Distribuição de Cestas Básicas", data: "2025-04-13" },
-    ],
-  },
-];
+export default function TelaVoluntariosEventos() {
+  const [viewMode, setViewMode] = useState("voluntarios");
+  const [voluntarioSelecionado, setVoluntarioSelecionado] = useState(null);
+  const [eventoSelecionado, setEventoSelecionado] = useState(null);
+  const [dadosVoluntarios, setDadosVoluntarios] = useState([]);
+  const [dadosEventos, setDadosEventos] = useState([]);
+  const [voluntarios, setVoluntarios] = useState([]);
+  const [eventos, setEventos] = useState([]);
 
-const dadosEventos = [
-  {
-    eventoId: 101,
-    nome: "Distribuição de Cestas Básicas",
-    data: "2025-04-13",
-    voluntarios: [
-      { id: 1, nome: "João da Silva" },
-      { id: 2, nome: "Maria Costa" },
-    ],
-  },
-  {
-    eventoId: 102,
-    nome: "Bazar Solidário",
-    data: "2025-04-14",
-    voluntarios: [{ id: 1, nome: "João da Silva" }],
-  },
-];
+
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        const participacoesSnap = await getDocs(collection(db, "bzmParticipacaoAgenda"));
+        const agendaSnap = await getDocs(collection(db, "bzmagenda"));
+        const usuariosSnap = await getDocs(collection(db, "bzmusuario"));
+  
+        const participacoes = participacoesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const agendas = agendaSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const usuarios = usuariosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  
+        // Montar lista de voluntários com eventos
+        const voluntariosComEventos = usuarios.map((usuario) => {
+          const eventosDoUsuario = participacoes
+            .filter(p => p.idUsuario === usuario.uid)
+            .map(p => {
+              const evento = agendas.find(a => a.id === p.idAgenda);
+              return evento ? {
+                eventoId: evento.id,
+                nomeEvento: evento.titulo,
+                data: evento.data
+              } : null;
+            })
+            .filter(Boolean);
+  
+          return eventosDoUsuario.length > 0
+            ? {
+                id: usuario.uid,
+                nome: usuario.nome,
+                eventos: eventosDoUsuario
+              }
+            : null;
+        }).filter(Boolean); // Remove nulos
+  
+        // Montar lista de eventos com voluntários
+        const eventosComVoluntarios = agendas.map((evento) => {
+          const participantes = participacoes
+            .filter(p => p.idAgenda === evento.id)
+            .map(p => {
+              const voluntario = usuarios.find(u => u.uid === p.idUsuario);
+              return voluntario ? { id: voluntario.uid, nome: voluntario.nome } : null;
+            })
+            .filter(Boolean);
+  
+          return {
+            eventoId: evento.id,
+            nome: evento.titulo,
+            data: evento.data,
+            voluntarios: participantes
+          };
+        });
+  
+        setVoluntarios(voluntariosComEventos);
+        setEventos(eventosComVoluntarios);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+      }
+    };
+  
+    carregarDados();
+  }, []);
+
+  const handleSelectChange = (value) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setViewMode(value);
+    setVoluntarioSelecionado(null);
+    setEventoSelecionado(null);
+  };
+
+  const toggleVoluntario = (item) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setVoluntarioSelecionado((prev) => (prev?.id === item.id ? null : item));
+  };
+
+  const toggleEvento = (item) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setEventoSelecionado((prev) => (prev?.eventoId === item.eventoId ? null : item));
+  };
+
+  const renderVoluntarios = () => (
+    <FlatList
+      data={voluntarios}
+      keyExtractor={(item) => item.id.toString()}
+      renderItem={({ item }) => (
+        <TouchableOpacity style={styles.card} onPress={() => toggleVoluntario(item)}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>{item.nome}</Text>
+            <AntDesign
+              name={voluntarioSelecionado?.id === item.id ? "up" : "down"}
+              size={20}
+              color="#6A5ACD"
+            />
+          </View>
+  
+          {voluntarioSelecionado?.id === item.id &&
+            item.eventos?.map((evento) => (
+              <View key={evento.eventoId} style={styles.cardDetails}>
+                <Text style={styles.detailText}>📍 {evento.nomeEvento}</Text>
+                <Text style={styles.detailDate}>🗓 {evento.data}</Text>
+              </View>
+            ))}
+        </TouchableOpacity>
+      )}
+    />
+  );
+  
+  const renderEventos = () => (
+    <FlatList
+      data={eventos}
+      keyExtractor={(item) => item.eventoId.toString()}
+      renderItem={({ item }) => (
+        <TouchableOpacity style={styles.card} onPress={() => toggleEvento(item)}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>
+              {item.nome} ({item.data})
+            </Text>
+            <AntDesign
+              name={eventoSelecionado?.eventoId === item.eventoId ? "up" : "down"}
+              size={20}
+              color="#6A5ACD"
+            />
+          </View>
+  
+          {eventoSelecionado?.eventoId === item.eventoId &&
+            item.voluntarios?.map((vol) => (
+              <View key={vol.id} style={styles.cardDetails}>
+                <Text style={styles.detailText}>🙋 {vol.nome}</Text>
+              </View>
+            ))}
+        </TouchableOpacity>
+      )}
+    />
+  );
+  
+
+  return (
+<View style={styles.container}>
+  <Text style={styles.titulo}>Escala de Voluntários</Text>
+  <CustomToggle selected={viewMode} onChange={handleSelectChange} />
+  {viewMode === "voluntarios" ? renderVoluntarios() : renderEventos()}
+</View>
+  );
+}
 
 const CustomToggle = ({ selected, onChange }) => {
   return (
@@ -79,95 +203,8 @@ const CustomToggle = ({ selected, onChange }) => {
   );
 };
 
-export default function TelaVoluntariosEventos() {
-  const [viewMode, setViewMode] = useState("voluntarios");
-  const [voluntarioSelecionado, setVoluntarioSelecionado] = useState(null);
-  const [eventoSelecionado, setEventoSelecionado] = useState(null);
-
-  const handleSelectChange = (value) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setViewMode(value);
-    setVoluntarioSelecionado(null);
-    setEventoSelecionado(null);
-  };
-
-  const toggleVoluntario = (item) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setVoluntarioSelecionado((prev) => (prev?.id === item.id ? null : item));
-  };
-
-  const toggleEvento = (item) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setEventoSelecionado((prev) => (prev?.eventoId === item.eventoId ? null : item));
-  };
-
-  const renderVoluntarios = () => (
-    <FlatList
-      data={dadosVoluntarios}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={({ item }) => (
-        <TouchableOpacity style={styles.card} onPress={() => toggleVoluntario(item)}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{item.nome}</Text>
-            <AntDesign
-              name={voluntarioSelecionado?.id === item.id ? "up" : "down"}
-              size={20}
-              color="#6A5ACD"
-            />
-          </View>
-
-          {voluntarioSelecionado?.id === item.id &&
-            item.eventos?.map((evento) => (
-              <View key={evento.eventoId} style={styles.cardDetails}>
-                <Text style={styles.detailText}>📍 {evento.nomeEvento}</Text>
-                <Text style={styles.detailDate}>🗓 {evento.data}</Text>
-              </View>
-            ))}
-        </TouchableOpacity>
-      )}
-    />
-  );
-
-  const renderEventos = () => (
-    <FlatList
-      data={dadosEventos}
-      keyExtractor={(item) => item.eventoId.toString()}
-      renderItem={({ item }) => (
-        <TouchableOpacity style={styles.card} onPress={() => toggleEvento(item)}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>
-              {item.nome} ({item.data})
-            </Text>
-            <AntDesign
-              name={eventoSelecionado?.eventoId === item.eventoId ? "up" : "down"}
-              size={20}
-              color="#6A5ACD"
-            />
-          </View>
-
-          {eventoSelecionado?.eventoId === item.eventoId &&
-            item.voluntarios?.map((vol) => (
-              <View key={vol.id} style={styles.cardDetails}>
-                <Text style={styles.detailText}>🙋 {vol.nome}</Text>
-              </View>
-            ))}
-        </TouchableOpacity>
-      )}
-    />
-  );
-
-  return (
-    <View style={styles.container}>
-      <CustomToggle selected={viewMode} onChange={handleSelectChange} />
-      {viewMode === "voluntarios" ? renderVoluntarios() : renderEventos()}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {paddingTop: height * 0.1, flex: 1, padding: 16, backgroundColor: "#fdfdfd" },
-
-  // Toggle estilizado
+  container: { paddingTop: height * 0.1, flex: 1, padding: 16, backgroundColor: "#fdfdfd" },
   toggleContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -175,6 +212,14 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     padding: 4,
     marginBottom: 16,
+  },
+  titulo: {
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 12,
+    color: "#333",
+    paddingBottom: 10,
   },
   toggleButton: {
     flex: 1,
@@ -192,8 +237,6 @@ const styles = StyleSheet.create({
   toggleTextSelected: {
     color: "#fff",
   },
-
-  // Card padrão
   card: {
     backgroundColor: "#fff",
     padding: 16,

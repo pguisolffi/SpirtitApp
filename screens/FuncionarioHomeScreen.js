@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
+  Platform ,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -26,6 +27,7 @@ const menuItems = [
   { label: 'Biblioteca', icon: 'library-outline', route: '/Rota_Livros' },
   { label: 'Orações', icon: 'heart-outline', route: '/Rota_OracoesScreen'},
   { label: 'Cursos e Palestras', icon: 'book-outline', route: '/Rota_CursosPalestrasScreen' },
+  { label: 'Estatísticas', icon: 'bar-chart-sharp', route: '/Rota_EstatisticasScreen' },
   { label: 'DEV', icon: 'build-outline', action: dev },
 ];
 
@@ -130,6 +132,7 @@ export default function HomeFuncionario() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.innerContainer}>
       {/* Botão de abrir Drawer */}
       <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
         <Ionicons name="menu" size={28} color="#333" />
@@ -182,6 +185,7 @@ export default function HomeFuncionario() {
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
       />
+      </View>
     </View>
   );
   
@@ -194,6 +198,11 @@ const styles = StyleSheet.create({
     paddingTop: height * 0.05, 
     paddingHorizontal: width * 0.04,
   }, 
+  innerContainer: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 800 : '100%',
+    alignSelf: 'center',
+  },
   menuButton: {
     position: 'absolute',
     top: 40,
@@ -227,7 +236,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   title: {
-    fontSize: width * 0.06,
+    fontSize: Platform.OS === 'web' ? 28 : width * 0.06,
     fontWeight: 'bold',
     color: '#333',
     textAlign: 'center',
@@ -240,18 +249,23 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.03,
   },
   gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     paddingBottom: height * 0.1,
     marginTop: 8,
   },
+ 
   card: {
     flex: 1,
+    width: Platform.OS === 'web' ? 160 : '45%',
     margin: width * 0.02,
     backgroundColor: '#6A5ACD',
     borderRadius: 12,
     padding: width * 0.04,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: height * 0.18,
+    minHeight: Platform.OS === 'web' ? 120 : height * 0.18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -262,7 +276,7 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.01,
   },
   cardText: {
-    fontSize: width * 0.04,
+    fontSize: Platform.OS === 'web' ? 16 : width * 0.04,
     color: '#fff',
     textAlign: 'center',
   },
@@ -271,8 +285,8 @@ const styles = StyleSheet.create({
     marginBottom: height * 0.03,
   },
   logo: {
-    width: width * 0.4,
-    height: width * 0.4,
+    width: Platform.OS === 'web' ? 200 : width * 0.4,
+    height: Platform.OS === 'web' ? 200 : width * 0.4,
   },
   drawerItemContainer: {
     backgroundColor: '#f5f5f5',

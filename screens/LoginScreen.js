@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator,Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -13,7 +13,7 @@ import Input from '../components/input';
 import { auth } from './firebaseConfig';
 import { AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LottieView from 'lottie-react-native'; // << Adicionado aqui
+import LottieView from 'lottie-react-native';
 
 const { width, height } = Dimensions.get('window');
 WebBrowser.maybeCompleteAuthSession();
@@ -76,58 +76,60 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <LinearGradient colors={['#e0f7fa', '#ffffff']} style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          {!loading && (
-            <Animatable.Image
-              animation="fadeInDown"
-              source={require('../assets/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          )} 
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+  <View style={styles.innerContainer}>
+    {!loading && (
+      <Animatable.Image
+        animation="fadeInDown"
+        source={require('../assets/logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+    )}
 
+    {loading && (
+      <View style={styles.loadingOverlay}>
+        <LottieView
+          source={require('../assets/birds.json')}
+          autoPlay
+          loop
+          style={{ width: 200, height: 200 }}
+        />
+        <Text style={{ marginTop: 20, fontSize: 16, color: '#555' }}>Aguarde...</Text>
+      </View>
+    )} 
 
-          {/* Se estiver carregando, mostra a animação */}
-          {loading && (
-            <View style={styles.loadingOverlay}>
-              <LottieView
-                source={require('../assets/birds.json')} // precisa de uma animação lottie de pássaros
-                autoPlay
-                loop
-                style={{ width: 200, height: 200 }}
-              />
-              <Text style={{ marginTop: 20, fontSize: 16, color: '#555' }}>Aguarde...</Text>
-            </View>
-          )}
+    {!loading && (
+      <Animatable.View animation="fadeInUp" style={styles.formBox}>
+        <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" /*style={Platform.OS === 'web' ? { width: '100%' } : {}}*/ />
+        <Input placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} /*style={Platform.OS === 'web' ? { width: '100%' } : {}}*/ />
 
-          {!loading && (
-            <Animatable.View animation="fadeInUp" style={styles.formBox}>
-              <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-              <Input placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} />
+        <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
+          <Text style={styles.loginText}>Entrar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.googleBtn} onPress={() => promptAsync()}>
+          <View style={styles.googleContent}>
+            <AntDesign name="google" size={20} color="#4285F4" />
+            <Text style={styles.googleText}>Entrar com Google</Text>
+          </View>
+        </TouchableOpacity>
 
-              <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-                <Text style={styles.loginText}>Entrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.googleBtn} onPress={() => promptAsync()}>
-                <View style={styles.googleContent}>
-                  <AntDesign name="google" size={20} color="#4285F4" />
-                  <Text style={styles.googleText}>Entrar com Google</Text>
-                </View>
-              </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/cadastroUsuarioScreen')}>
+          <Text style={styles.register}>Cadastre-se</Text>
+        </TouchableOpacity>
 
-              <TouchableOpacity onPress={() => router.push('/cadastroUsuarioScreen')}>
-                <Text style={styles.register}>Cadastre-se</Text>
-              </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/Rota_RecuperarSenhaScreen')}>
+          <Text style={styles.forgot}>Esqueceu a senha?</Text>
+        </TouchableOpacity>
+      </Animatable.View>
+    )}
 
-              <TouchableOpacity onPress={() => router.push('/Rota_RecuperarSenhaScreen')}>
-                <Text style={styles.forgot}>Esqueceu a senha?</Text>
-              </TouchableOpacity>
-            </Animatable.View>
-          )}
-          {!loading && (
-          <Text style={styles.footer}>© 2025 - Fraternidade Bezerra de Menezes</Text>
-          )}
-        </ScrollView>
+    {!loading && (
+      <Text style={styles.footer}>© 2025 - Fraternidade Bezerra de Menezes</Text>
+    )}
+  </View>
+</ScrollView>
+
       </LinearGradient>
     </SafeAreaView>
   );
@@ -137,17 +139,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: width * 0.05,
+    paddingHorizontal: width * 0.15,
   },
   logo: {
-    width: width * 0.8,
-    height: width * 0.8,
+    width: Platform.OS === 'web' ? 390 :width * 0.8,
+    height: Platform.OS === 'web' ? 390 :width * 0.8,
     marginBottom: 20,
-    paddingTop: height * 0.45,
+    paddingTop: Platform.OS === 'web' ? 300 :height * 0.45,
   },
   formBox: {
     width: '100%',
-    paddingHorizontal: 10,
+    justifyContent: 'center',
+    paddingHorizontal: Platform.OS === 'web' ? 40 :10,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 1200 : null,
+    alignSelf: 'center',
+    marginTop: Platform.OS === 'web' ? 5 :10,
   },
   loginBtn: {
     backgroundColor: '#007AFF',
@@ -158,7 +165,7 @@ const styles = StyleSheet.create({
   },
   loginText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 18 : 16,
     fontWeight: 'bold',
   },
   googleBtn: {
@@ -174,7 +181,7 @@ const styles = StyleSheet.create({
   },
   googleText: {
     color: '#4285F4',
-    fontSize: 16,
+    fontSize: Platform.OS === 'web' ? 18 : 16,
     fontWeight: 'bold',
     marginLeft: 8,
   },
@@ -187,11 +194,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#007AFF',
     textAlign: 'center',
+    fontSize: Platform.OS === 'web' ? 18 : 16,
   },
   forgot: {
     marginTop: 8,
     color: '#007AFF',
     textAlign: 'center',
+    fontSize: Platform.OS === 'web' ? 18 : 16,
   },
   scrollContainer: {
     paddingBottom: 40,
@@ -203,7 +212,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 10,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: Platform.OS === 'web' ? 14 : 12,
     color: '#888',
   },
   loadingOverlay: {
@@ -213,5 +222,11 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     zIndex: 999,
+  },
+  innerContainer: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
   },
 });

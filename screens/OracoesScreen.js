@@ -105,7 +105,7 @@ export default function OracoesScreen() {
   };
 
   const abrirMenuOpcoes = (item) => {
-    if (perfilUsuario !== 'admin') return;
+    if (perfilUsuario !== 'ADMINISTRADOR') return;
 
     Alert.alert(
       'Opções',
@@ -175,7 +175,7 @@ export default function OracoesScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {perfilUsuario === 'admin' && (
+      {perfilUsuario === 'ADMINISTRADOR' && (
         <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
           <Ionicons name="add" size={32} color="#fff" />
         </TouchableOpacity>

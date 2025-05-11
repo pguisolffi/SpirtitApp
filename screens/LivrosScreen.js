@@ -233,7 +233,7 @@ export default function LivrosScreen() {
                 </Text>
               </TouchableOpacity>
             )}
-            {(perfilUsuario === 'admin') && (
+            {(perfilUsuario === 'ADMINISTRADOR') && (
               <TouchableOpacity
                 onPress={() => removerLivro(item)}
                 style={styles.botaoRemover}
@@ -332,7 +332,7 @@ export default function LivrosScreen() {
         renderItem={renderItem}
         ListEmptyComponent={<Text style={styles.emptyText}>Nenhum livro encontrado.</Text>}
       />
-      {(perfilUsuario === 'admin' || perfilUsuario === 'administrador') && (
+      {(perfilUsuario === 'ADMINISTRADOR' || perfilUsuario === 'administrador') && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => setModalVisible(true)}

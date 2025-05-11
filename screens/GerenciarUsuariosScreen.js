@@ -33,6 +33,9 @@ export default function GerenciarUsuariosScreen() {
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState('');
   const [menuVisible, setMenuVisible] = useState({});
+  const [perfilModalVisible, setPerfilModalVisible] = useState(false);
+  const [usuarioEditandoPerfil, setUsuarioEditandoPerfil] = useState(null);
+  const [voluntarios, setVoluntarios] = useState([]);
 
   useEffect(() => {
     const carregarUsuarios = async () => {
@@ -80,14 +83,13 @@ export default function GerenciarUsuariosScreen() {
     }
   };
 
-  const perfisDisponiveis = ['Administrador', 'Usuário Comum'];
-
-  const permissoesDisponiveis = [
-    'atendimento',
-    'eventos',
-    'biblioteca',
-    'Orientador',
-    'cadastro',
+  const perfisDisponiveis = [
+    'ADMINISTRADOR',
+    'COORDENADOR',
+    'VOLUNTARIO',
+    'ATENDENTE',
+    'ORIENTADOR',
+    'VISITANTE',
   ];
 
   const atualizarCampo = (id, campo, valor) => {
@@ -96,26 +98,12 @@ export default function GerenciarUsuariosScreen() {
     );
   };
 
-  const togglePermissao = (id, permissao) => {
-    setUsuarios(prev =>
-      prev.map(u => {
-        if (u.id === id) {
-          const permissoesAtualizadas = u.permissoes?.includes(permissao)
-            ? u.permissoes.filter(p => p !== permissao)
-            : [...(u.permissoes || []), permissao];
-          return { ...u, permissoes: permissoesAtualizadas };
-        }
-        return u;
-      })
-    );
-  };
-
   const renderUsuario = ({ item }) => {
     const selecionado = usuarioSelecionado === item.id;
     const isMenuVisible = menuVisible[item.id] || false;
 
     return (
-      <View style={styles.card}>
+      <View>
         <TouchableOpacity onPress={() => toggleSelecionar(item.id)}>
           <Text style={styles.nome}>{item.nome}</Text>
           <Text style={styles.email}>{item.email}</Text>
@@ -148,51 +136,51 @@ export default function GerenciarUsuariosScreen() {
                 placeholder="Data de Nascimento (DD/MM/AAAA)"
                 keyboardType="numeric"
               />
-              <Provider>
-                <Menu
-                  visible={isMenuVisible}
-                  onDismiss={() => setMenuVisible(prev => ({ ...prev, [item.id]: false }))}
-                  anchor={
-                    <TouchableOpacity
-                      style={styles.dropdownAnchor}
-                      onPress={() => setMenuVisible(prev => ({ ...prev, [item.id]: !isMenuVisible }))}
-                    >
-                      <Text style={styles.dropdownText}>{item.perfil || 'Selecionar Perfil'}</Text>
-                    </TouchableOpacity>
-                  }
-                >
-                  {perfisDisponiveis.map(perfil => (
-                    <Menu.Item
-                      key={perfil}
-                      onPress={() => {
-                        atualizarCampo(item.id, 'perfil', perfil);
-                        setMenuVisible(prev => ({ ...prev, [item.id]: false }));
-                      }}
-                      title={perfil}
-                    />
-                  ))}
-                </Menu>
-              </Provider>
-              <View style={styles.chipsContainer}>
-                {permissoesDisponiveis.map(permissao => (
-                  <TouchableOpacity
-                    key={permissao}
-                    style={[styles.chip, item.permissoes?.includes(permissao) && styles.chipSelecionado]}
-                    onPress={() => togglePermissao(item.id, permissao)}
-                  >
-                    <Text style={styles.chipText}>{permissao}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity style={styles.saveButton} onPress={() => handleSalvar(item)}>
-                <Text style={styles.saveButtonText}>{salvando ? 'Salvando...' : 'Salvar Alterações'}</Text>
-              </TouchableOpacity>
             </>
           )}
         </TouchableOpacity>
+
+        {selecionado && (
+          <Provider>
+            <Menu
+              visible={isMenuVisible}
+              onDismiss={() => setMenuVisible(prev => ({ ...prev, [item.id]: false }))}
+              anchor={
+                <TouchableOpacity
+                  style={styles.dropdownAnchor}
+                  onPress={() => {
+                    setUsuarioEditandoPerfil(item.id);
+                    setPerfilModalVisible(true);
+                  }}
+                >
+                  <Text style={styles.dropdownText}>{item.perfil || 'Selecionar Perfil'}</Text>
+                </TouchableOpacity>
+              }
+            >
+              {perfisDisponiveis.map(perfil => (
+                <Menu.Item
+                  key={perfil}
+                  onPress={() => {
+                    atualizarCampo(item.id, 'perfil', perfil);
+                    setMenuVisible(prev => ({ ...prev, [item.id]: false }));
+                  }}
+                  title={perfil}
+                />
+              ))}
+            </Menu>
+          </Provider>
+        )}
+
+        {selecionado && (
+          <TouchableOpacity style={styles.saveButton} onPress={() => handleSalvar(item)}>
+            <Text style={styles.saveButtonText}>{salvando ? 'Salvando...' : 'Salvar Alterações'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
     );
   };
+
 
   const usuariosFiltrados = usuarios.filter(u =>
     u.nome?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -206,6 +194,7 @@ export default function GerenciarUsuariosScreen() {
       </View>
     );
   }
+
 
   return (
     <View style={styles.container}>
@@ -223,6 +212,29 @@ export default function GerenciarUsuariosScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
+        {perfilModalVisible && (
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalContent}>
+        <Text style={styles.modalTitle}>Selecionar Perfil</Text>
+        {perfisDisponiveis.map(perfil => (
+          <TouchableOpacity
+            key={perfil}
+            style={styles.modalOption}
+            onPress={() => {
+              atualizarCampo(usuarioEditandoPerfil, 'perfil', perfil);
+              setPerfilModalVisible(false);
+              setUsuarioEditandoPerfil(null);
+            }}
+          >
+            <Text style={styles.modalOptionText}>{perfil}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity onPress={() => setPerfilModalVisible(false)}>
+          <Text style={styles.modalCancelar}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )}
     </View>
   );
 }
@@ -237,10 +249,48 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#f2f2f2', borderRadius: 8, padding: 10, marginVertical: 5 },
   dropdownAnchor: { backgroundColor: '#f2f2f2', padding: 10, borderRadius: 8, marginTop: 10 },
   dropdownText: { color: '#333' },
-  chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
-  chip: { backgroundColor: '#e0e0e0', borderRadius: 16, paddingVertical: 5, paddingHorizontal: 12, margin: 4 },
-  chipSelecionado: { backgroundColor: '#6A5ACD' },
-  chipText: { color: '#333' },
   saveButton: { backgroundColor: '#6A5ACD', padding: 12, borderRadius: 8, marginTop: 10, alignItems: 'center' },
   saveButtonText: { color: '#fff', fontWeight: 'bold' },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: width * 0.8,
+    elevation: 5,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalOption: {
+    paddingVertical: 10,
+    width: '100%',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  modalCancelar: {
+    marginTop: 15,
+    color: '#6A5ACD',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+
 });

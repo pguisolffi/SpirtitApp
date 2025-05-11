@@ -39,7 +39,7 @@ export default function ContaScreen() {
           const docData = snapshot.docs[0].data();
           setUsuario(docData);
           setIdDocUsuario(snapshot.docs[0].id); // salva o id do documento para o update
-          setIsAdmin(docData.perfil === 'Administrador');
+          setIsAdmin(docData.perfil === 'ADMINISTRADOR');
         } else {
           console.error('Usuário não encontrado no Firestore.');
         }
