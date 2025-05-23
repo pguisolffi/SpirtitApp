@@ -11,9 +11,11 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
+  Linking
 } from 'react-native';
-import { collection,query,where, getDocs, addDoc, deleteDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './firebaseConfig'; // Agora importa o auth também
+import { collection, query, where, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import { auth, db } from './firebaseConfig';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -29,6 +31,8 @@ export default function CursosPalestrasScreen() {
   const [novaDescricao, setNovaDescricao] = useState('');
   const [editandoId, setEditandoId] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState('');
+  const [menuAberto, setMenuAberto] = useState(null);
+
   const router = useRouter();
 
   useEffect(() => {
@@ -55,12 +59,9 @@ export default function CursosPalestrasScreen() {
       if (user) {
         const q = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
         const querySnapshot = await getDocs(q);
-  
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
           setPerfilUsuario(dados.perfil);
-        } else {
-          console.log('Usuário não encontrado no Firestore');
         }
       }
     } catch (error) {
@@ -77,7 +78,11 @@ export default function CursosPalestrasScreen() {
   const abrirVideo = (curso) => {
     const videoId = extrairVideoId(curso.urlyoutube);
     if (videoId) {
-      router.push({ pathname: '/Rota_VideoViewerScreen', params: { videoId } });
+      if (Platform.OS === 'web') {
+        Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`);
+      } else {
+        router.push({ pathname: '/Rota_VideoViewerScreen', params: { videoId } });
+      }
     } else {
       alert('Vídeo inválido.');
     }
@@ -88,7 +93,6 @@ export default function CursosPalestrasScreen() {
       alert('Preencha o título e a URL.');
       return;
     }
-
     try {
       if (editandoId) {
         await updateDoc(doc(db, 'bzmcursospalestras', editandoId), {
@@ -105,32 +109,15 @@ export default function CursosPalestrasScreen() {
         });
         alert('Vídeo adicionado com sucesso!');
       }
-
       setNovoTitulo('');
       setNovoUrl('');
       setNovaDescricao('');
       setEditandoId(null);
       setModalVisible(false);
       carregarCursos();
-
     } catch (error) {
       console.error('Erro ao salvar curso:', error);
     }
-  };
-
-  const abrirMenuOpcoes = (item) => {
-    if (perfilUsuario !== 'admin') return; 
-
-    Alert.alert(
-      'Opções',
-      `O que deseja fazer com "${item.titulo}"?`,
-      [
-        { text: 'Editar', onPress: () => editarVideo(item) },
-        { text: 'Excluir', onPress: () => excluirVideo(item) },
-        { text: 'Cancelar', style: 'cancel' }
-      ],
-      { cancelable: true }
-    );
   };
 
   const editarVideo = (item) => {
@@ -139,6 +126,7 @@ export default function CursosPalestrasScreen() {
     setNovaDescricao(item.descricao);
     setEditandoId(item.id);
     setModalVisible(true);
+    setMenuAberto(null);
   };
 
   const excluirVideo = async (item) => {
@@ -146,6 +134,7 @@ export default function CursosPalestrasScreen() {
       await deleteDoc(doc(db, 'bzmcursospalestras', item.id));
       alert('Vídeo excluído com sucesso!');
       carregarCursos();
+      setMenuAberto(null);
     } catch (error) {
       console.error('Erro ao excluir:', error);
       alert('Erro ao excluir.');
@@ -166,49 +155,73 @@ export default function CursosPalestrasScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🎬 Cursos e Palestras</Text>
+      <View style={styles.content}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+  <Ionicons name="arrow-back" size={28} color="#6A5ACD" />
+</TouchableOpacity>
+        <Text style={styles.title}>🎬 Cursos e Palestras</Text>
 
-      <TextInput
-        style={styles.inputFiltro}
-        placeholder="Buscar cursos..."
-        value={filtro}
-        onChangeText={setFiltro}
-      />
+        <TextInput
+          style={styles.inputFiltro}
+          placeholder="Buscar cursos..."
+          value={filtro}
+          onChangeText={setFiltro}
+        />
 
-      <FlatList
-        data={cursosFiltrados}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        renderItem={({ item }) => {
-          const videoId = extrairVideoId(item.urlyoutube);
-          const thumbnailUrl = videoId
-            ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-            : null;
+        <FlatList
+          data={cursosFiltrados}
+          keyExtractor={(item) => item.id}
+          numColumns={Platform.OS === 'web' ? 3 : 2}
+          renderItem={({ item }) => {
+            const videoId = extrairVideoId(item.urlyoutube);
+            const thumbnailUrl = videoId
+              ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+              : null;
 
-          return (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => abrirVideo(item)}
-              onLongPress={() => abrirMenuOpcoes(item)}
-            >
-              {thumbnailUrl && (
-                <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} />
-              )}
-              <Text style={styles.cardTitle}>{item.titulo}</Text>
-            </TouchableOpacity>
-          );
-        }}
-        showsVerticalScrollIndicator={false}
-      />
+            return (
+              <View style={styles.card}>
+                <TouchableOpacity onPress={() => abrirVideo(item)} style={{ flex: 1 }}>
+                  {thumbnailUrl && (
+                    <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} />
+                  )}
+                  <Text style={styles.cardTitle}>{item.titulo}</Text>
+                   {item.descricao ? (
+            <Text style={styles.cardDescricao}>{item.descricao}</Text>
+          ) : null}
+                </TouchableOpacity>
 
-      {/* Botão flutuante apenas para admins */}
-      {perfilUsuario === 'admin' && (
+                {perfilUsuario === 'ADMINISTRADOR' && (
+                  <TouchableOpacity
+                    onPress={() => setMenuAberto(menuAberto === item.id ? null : item.id)}
+                    style={styles.menuButton}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={28} color="#6A5ACD" />
+                  </TouchableOpacity>
+                )}
+
+                {menuAberto === item.id && (
+                  <View style={styles.popoverMenu}>
+                    <TouchableOpacity onPress={() => editarVideo(item)} style={styles.menuOption}>
+                      <Text style={styles.menuOptionText}>Editar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => excluirVideo(item)} style={styles.menuOption}>
+                      <Text style={styles.menuOptionText}>Excluir</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          }}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
+
+      {perfilUsuario === 'ADMINISTRADOR' && (
         <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
           <Ionicons name="add" size={32} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* Modal de adicionar/editar */}
       <Modal
         animationType="slide"
         transparent
@@ -260,7 +273,6 @@ export default function CursosPalestrasScreen() {
                 <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
               </TouchableOpacity>
             </View>
-
           </View>
         </View>
       </Modal>
@@ -269,16 +281,22 @@ export default function CursosPalestrasScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 10, backgroundColor: '#f9f9f9' },
-  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, color: '#333', paddingTop: height * 0.06 },
+  container: { flex: 1, backgroundColor: '#f9f9f9', paddingTop: height * 0.05 },
+  content: { width: '90%', maxWidth: 1000, alignSelf: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, color: '#333' },
   inputFiltro: { backgroundColor: '#fff', borderRadius: 8, padding: 10, marginBottom: 10, elevation: 2 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { flex: 1, margin: 5, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 3 },
-  thumbnail: { width: '100%', height: width * 0.4 },
+  card: { flex: 1, margin: 5, backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden', elevation: 3, position: 'relative' },
+  thumbnail: { width: '100%', height: width * 0.25 },
   cardTitle: { fontSize: 14, fontWeight: 'bold', padding: 8, textAlign: 'center', color: '#333' },
+  cardDescricao: { fontSize: 12, paddingHorizontal: 8, color: '#666', textAlign: 'center' },
+  menuButton: { position: 'absolute', top: 8, right: 8, padding: 4 },
+  popoverMenu: { position: 'absolute', top: 40, right: 8, backgroundColor: '#fff', borderRadius: 8, elevation: 3, padding: 5, zIndex: 10 },
+  menuOption: { padding: 8 },
+  menuOptionText: { color: '#6A5ACD', fontWeight: 'bold' },
   fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#6A5ACD', borderRadius: 30, padding: 15, elevation: 5 },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '85%' },
+  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '85%', maxWidth: 400 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   modalInput: { backgroundColor: '#f1f1f1', borderRadius: 8, padding: 10, marginBottom: 10 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },

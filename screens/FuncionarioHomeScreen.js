@@ -26,9 +26,10 @@ const menuItems = [
   { label: 'Próximos Eventos', icon: 'calendar-outline', route: '/Rota_AgendaScreen' },
   { label: 'Escala de Voluntários', icon: 'list-circle-outline', route: '/Rota_EscalaVoluntarios' },
   { label: 'Biblioteca', icon: 'library-outline', route: '/Rota_Livros' },
-  { label: 'Orações', icon: 'heart-outline', route: '/Rota_OracoesScreen'},
-  { label: 'Cursos e Palestras', icon: 'book-outline', route: '/Rota_CursosPalestrasScreen' },
-  { label: 'DEV', icon: 'build-outline', action: dev },
+  { label: 'Orações', icon: 'book-outline', route: '/Rota_OracoesScreen'},
+  { label: 'Cursos e Palestras', icon: 'videocam-outline', route: '/Rota_CursosPalestrasScreen' },
+  { label: 'Estatísticas', icon: 'bar-chart', route: '/Rota_EstatisticasScreen' },
+  //{ label: 'DEV', icon: 'build-outline', action: dev },
 ];
 
 const drawerItems = [
@@ -84,7 +85,7 @@ export default function HomeFuncionario() {
       activeOpacity={0.8}
       onPress={() => handlePress(item)}
     >
-      <Ionicons name={item.icon} size={width * 0.1} color="#fff" style={styles.icon} />
+      <Ionicons name={item.icon} size={width * 0.05} color="#fff" style={styles.icon} />
       <Text style={styles.cardText}>{item.label}</Text>
     </TouchableOpacity>
   );
@@ -273,7 +274,7 @@ card: {
 },
 
   icon: {
-    marginBottom: height * 0.01,
+    marginBottom: height * 0.001,
   },
 cardText: {
   fontSize: Platform.OS === 'web' ? 16 : width * 0.04,

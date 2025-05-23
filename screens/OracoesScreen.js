@@ -11,11 +11,13 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform
 } from 'react-native';
-import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc,getDoc,where, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, where, query, orderBy } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeft } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,18 +51,15 @@ export default function OracoesScreen() {
     }
   };
 
- const buscarPerfilUsuario = async () => {
+  const buscarPerfilUsuario = async () => {
     try {
       const user = auth.currentUser;
       if (user) {
         const q = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
         const querySnapshot = await getDocs(q);
-  
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
           setPerfilUsuario(dados.perfil);
-        } else {
-          console.log('Usuário não encontrado no Firestore');
         }
       }
     } catch (error) {
@@ -151,35 +150,42 @@ export default function OracoesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🙏 Orações</Text>
+      <View style={styles.content}>
+        {/* Botão de voltar */}
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#333" />
+        </TouchableOpacity>
 
-      <TextInput
-        style={styles.inputFiltro}
-        placeholder="Buscar orações..."
-        value={filtro}
-        onChangeText={setFiltro}
-      />
+        <Text style={styles.title}>🙏 Orações</Text>
 
-      <FlatList
-        data={oracoesFiltradas}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => abrirOracao(item)}
-            onLongPress={() => abrirMenuOpcoes(item)}
-          >
-            <Text style={styles.cardTitle}>{item.titulo}</Text>
+        <TextInput
+          style={styles.inputFiltro}
+          placeholder="Buscar orações..."
+          value={filtro}
+          onChangeText={setFiltro}
+        />
+
+        <FlatList
+          data={oracoesFiltradas}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => abrirOracao(item)}
+              onLongPress={() => abrirMenuOpcoes(item)}
+            >
+              <Text style={styles.cardTitle}>{item.titulo}</Text>
+            </TouchableOpacity>
+          )}
+          showsVerticalScrollIndicator={false}
+        />
+
+        {perfilUsuario === 'admin' && (
+          <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+            <Ionicons name="add" size={32} color="#fff" />
           </TouchableOpacity>
         )}
-        showsVerticalScrollIndicator={false}
-      />
-
-      {perfilUsuario === 'admin' && (
-        <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-          <Ionicons name="add" size={32} color="#fff" />
-        </TouchableOpacity>
-      )}
+      </View>
 
       {/* Modal de adicionar/editar */}
       <Modal
@@ -189,7 +195,7 @@ export default function OracoesScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
             <Text style={styles.modalTitle}>
               {editandoId ? 'Editar Oração' : 'Adicionar Nova Oração'}
             </Text>
@@ -226,8 +232,7 @@ export default function OracoesScreen() {
                 <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
               </TouchableOpacity>
             </View>
-
-          </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -236,16 +241,62 @@ export default function OracoesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 10, backgroundColor: '#f9f9f9' },
-  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10, color: '#333', paddingTop: height * 0.06 },
-  inputFiltro: { backgroundColor: '#fff', borderRadius: 8, padding: 10, marginBottom: 10, elevation: 2 },
+  content: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 800 : '100%',
+    alignSelf: 'center',
+  },
+  backButton: { marginBottom: 10 },
+  title: {
+    fontSize: Platform.OS === 'web' ? 28 : 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+    color: '#333',
+    paddingTop: height * 0.02
+  },
+  inputFiltro: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    elevation: 2,
+    width: '100%',
+  },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { backgroundColor: '#fff', marginVertical: 5, padding: 15, borderRadius: 8, elevation: 2 },
+  card: {
+    backgroundColor: '#fff',
+    marginVertical: 5,
+    padding: 15,
+    borderRadius: 8,
+    elevation: 2,
+    width: '100%',
+  },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#6A5ACD', borderRadius: 30, padding: 15, elevation: 5 },
-  modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '85%' },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#6A5ACD',
+    borderRadius: 30,
+    padding: 15,
+    elevation: 5
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    width: '85%',
+    maxWidth: Platform.OS === 'web' ? 600 : '85%',
+  },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  modalInput: { backgroundColor: '#f1f1f1', borderRadius: 8, padding: 10, marginBottom: 10 },
+  modalInput: { backgroundColor: '#f1f1f1', borderRadius: 8, padding: 10, marginBottom: 10, width: '100%' },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   modalButton: { flex: 1, backgroundColor: '#6A5ACD', borderRadius: 8, padding: 10, marginHorizontal: 5, alignItems: 'center' },
   modalButtonText: { color: '#fff', fontWeight: 'bold' },

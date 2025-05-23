@@ -25,15 +25,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false); // << Novo estado para controlar animação
-  const [modalVisible, setModalVisible] = useState(false);
-  const [novoTitulo, setNovoTitulo] = useState('');
-  const [novoAutor, setNovoAutor] = useState('');
-  const [novoLinkPDF, setNovoLinkPDF] = useState('');
-  const [novoPrecoVenda, setNovoPrecoVenda] = useState('');
-  const [novoEstoque, setNovoEstoque] = useState('');
-  const [novoTemPDF, setNovoTemPDF] = useState(false);
-  const [novoVendaDisponivel, setNovoVendaDisponivel] = useState(false);
-  const [novoEmprestimoDisponivel, setNovoEmprestimoDisponivel] = useState(false);
+
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: 'SEUS_CLIENT_IDS_AQUI',
