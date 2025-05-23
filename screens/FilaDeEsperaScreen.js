@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,10 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import DraggableFlatList from 'react-native-draggable-flatlist';
-import { useEffect, useRef  } from 'react';
 import { collection, query, where, getDocs,doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig'; 
 
@@ -37,10 +38,10 @@ const CustomSalaSelector = ({ selectedIndex, onChange }) => {
     onChange(index);
   };
 
+ 
   return (
     <View style={styles.selectorWrapper}>
-      <Text style={styles.screenTitle}>Fila de Espera</Text>
-
+      
       <View style={styles.salaSelectorContainer}>
         {labels.map((label, index) => (
           <TouchableOpacity
@@ -76,7 +77,6 @@ const CustomSalaSelector = ({ selectedIndex, onChange }) => {
 const WaitingQueue = () => {
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [isModalVisible, setModalVisible] = useState(false);
   const [roomModalVisible, setRoomModalVisible] = useState(false);
   const [colorModalVisible, setColorModalVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -91,6 +91,8 @@ const WaitingQueue = () => {
   const animation = useRef(new Animated.Value(0)).current;
   const [refreshing, setRefreshing] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+   const router = useRouter();
+
 
 
 
@@ -126,60 +128,61 @@ const WaitingQueue = () => {
       Alert.alert('Erro', 'Não foi possível carregar o histórico.');
     }
   };
+
+  const buscarPacientesAguardando = async () => {
+  try {
+    const colRef = collection(db, 'bzmAtendimentoHist');
+    const q = query(colRef, where('status', '==', 'aguardando'));
+    const snapshot = await getDocs(q);
+
+    const atendimentos = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      id_paciente: doc.data().id_paciente,
+      room: doc.data().sala_atendida || '',
+      priorityColor: doc.data().prioridade || '#FFF',
+    }));
+
+    const pacientesCompletos = await Promise.all(
+      atendimentos.map(async (at) => {
+        try {
+          const pessoaSnap = await getDocs(
+            query(collection(db, 'bzmpessoa'), where('idPessoa', '==', at.id_paciente))
+          );
+
+          if (!pessoaSnap.empty) {
+            const pessoa = pessoaSnap.docs[0].data();
+            return {
+              ...at,
+              name: pessoa.nome || 'Paciente',
+              birthDate: pessoa.dataNascimento || '--/--/----',
+            };
+          } else {
+            return {
+              ...at,
+              name: 'Paciente não encontrado',
+              birthDate: '--/--/----',
+            };
+          }
+        } catch (error) {
+          console.error('Erro ao buscar dados do paciente:', error);
+          return {
+            ...at,
+            name: 'Erro ao buscar nome',
+            birthDate: '--/--/----',
+          };
+        }
+      })
+    );
+
+    setPatients(pacientesCompletos);
+  } catch (error) {
+    console.error('Erro ao buscar pacientes aguardando:', error);
+  }
+};
   
 
   useEffect(() => {
-    const buscarPacientesAguardando = async () => {
-      try {
-        const colRef = collection(db, 'bzmAtendimentoHist');
-        const q = query(colRef, where('status', '==', 'aguardando'));
-        const snapshot = await getDocs(q);
-  
-        const atendimentos = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          id_paciente: doc.data().id_paciente,
-          room: doc.data().sala_atendida || '',
-          priorityColor: doc.data().prioridade || '#FFF',
-        }));
-  
-        // Agora busca os dados da pessoa na coleção 'bzmpessoa'
-        const pacientesCompletos = await Promise.all(
-          atendimentos.map(async (at) => {
-            try {
-              const pessoaSnap = await getDocs(
-                query(collection(db, 'bzmpessoa'), where('idPessoa', '==', at.id_paciente))
-              );
-  
-              if (!pessoaSnap.empty) {
-                const pessoa = pessoaSnap.docs[0].data();
-                return {
-                  ...at,
-                  name: pessoa.nome || 'Paciente',
-                  birthDate: pessoa.dataNascimento || '--/--/----',
-                };
-              } else {
-                return {
-                  ...at,
-                  name: 'Paciente não encontrado',
-                  birthDate: '--/--/----',
-                };
-              }
-            } catch (error) {
-              console.error('Erro ao buscar dados do paciente:', error);
-              return {
-                ...at,
-                name: 'Erro ao buscar nome',
-                birthDate: '--/--/----',
-              };
-            }
-          })
-        );
-  
-        setPatients(pacientesCompletos);
-      } catch (error) {
-        console.error('Erro ao buscar pacientes aguardando:', error);
-      }
-    };
+    
 
     buscarPacientesAguardando();
 
@@ -193,19 +196,6 @@ const WaitingQueue = () => {
   }, []);
   
   
-
-  const handleEdit = (patient) => {
-    setSelectedPatient(patient);
-    setModalVisible(true);
-  };
-
-  const handleSave = () => {
-    setPatients((prev) =>
-      prev.map((p) => (p.id === selectedPatient.id ? selectedPatient : p))
-    );
-    setModalVisible(false);
-  };
-
   const handleRoomChange = (room) => {
     if (!selectedPatient) return;
     const updatedPatient = { ...selectedPatient, room };
@@ -221,10 +211,6 @@ const WaitingQueue = () => {
     setRefreshing(true);
     await buscarPacientesAguardando();
     setRefreshing(false);
-  };
-
-  const handleShowHistory = (patientId) => {
-    alert(`Histórico de atendimentos para o paciente ${patientId}`);
   };
 
   const handleColorChange = (color) => {
@@ -334,7 +320,20 @@ const WaitingQueue = () => {
 
   return (
     <View style={styles.container}>
-      <CustomSalaSelector selectedIndex={selectedIndex} onChange={handleTabChange} />
+      <View style={styles.wrapper}>
+<View style={styles.topBar}>
+  <TouchableOpacity
+    onPress={() => router.push('/Rota_HomeFuncionario')}
+    style={styles.backButton}
+  >
+    <Ionicons name="chevron-back" size={24} color="#333" />
+  </TouchableOpacity>
+
+  <Text style={styles.topBarTitle}>Fila de Espera</Text>
+</View>
+
+<CustomSalaSelector selectedIndex={selectedIndex} onChange={handleTabChange} />
+
       <DraggableFlatList
         data={filteredPatients}
         keyExtractor={(item) => item.id}
@@ -367,7 +366,10 @@ const WaitingQueue = () => {
   onRequestClose={() => setRoomModalVisible(false)}
 >
   <View style={styles.modalOverlay}>
-    <View style={styles.modalContainer}>
+    <View style={[
+    styles.modalContainer,
+    Platform.OS === 'web' && { width: '90%', maxWidth: 400 },
+  ]}>
       <Text style={styles.modalTitle}>Selecione uma Sala</Text>
 
       <View style={{ width: '100%' }}>
@@ -379,7 +381,10 @@ const WaitingQueue = () => {
               style={styles.salaOptionButton}
               onPress={() => handleRoomChange(sala)}
             >
-              <Icon name={icons[index]} size={18} color="#555" style={{ marginRight: 12 }} />
+              <Icon   name={icons[index]}
+  size={Platform.OS === 'web' ? 16 : 18}
+  color="#555"
+  style={{ marginRight: Platform.OS === 'web' ? 8 : 12 }} />
               <Text style={styles.salaOptionText}>{sala}</Text>
             </TouchableOpacity>
           );
@@ -430,10 +435,17 @@ const WaitingQueue = () => {
   onRequestClose={() => setHistoricoModalVisible(false)}
 >
   <View style={styles.modalOverlay}>
-    <View style={[styles.modalContainer, { alignItems: 'flex-start' }]}>
+    <View
+  style={[
+    styles.modalContainer,
+    {
+      alignItems: 'flex-start',
+      ...(Platform.OS === 'web' && { width: '90%', maxWidth: 500 }),
+    },
+  ]}>
       <Text style={styles.modalTitle}>Histórico do Paciente</Text>
 
-      <ScrollView style={{ maxHeight: height * 0.5, width: '100%' }}>
+      <ScrollView style={{ maxHeight: Platform.OS === 'web' ? 300 : height * 0.5, width: '100%' }}>
         {historicoPaciente.length === 0 ? (
           <Text style={{ color: '#666' }}>Nenhum atendimento anterior registrado.</Text>
         ) : (
@@ -540,10 +552,8 @@ onPress={async () => {
       status: 'atendido',
     });
 
-    setAnimatingCardId(selectedPatient.id);
-LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
 setAnimatingCardId(selectedPatient.id);
+LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
 Animated.timing(animation, {
   toValue: 1,
@@ -586,217 +596,302 @@ Animated.timing(animation, {
   </View>
 </Modal>
 
-
+</View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingTop: height * 0.1,
-    flex: 1,
-    paddingHorizontal: width * 0.00,
-    paddingBottom: height * 0.02,
-  },
-  selectorWrapper: {
-    marginBottom: height * 0.02,
-  },
-  screenTitle: {
-    fontSize: width * 0.06,
-    fontWeight: 'bold',
-    marginBottom: height * 0.015,
-    textAlign: 'center',
-    color: '#333',
-  },
-  salaSelectorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    borderRadius: 100,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  salaButton: {
-    flexDirection: 'row',
+  actionButton: {
     alignItems: 'center',
-    paddingVertical: height * 0.012,
-    paddingHorizontal: width * 0.035,
-    borderRadius: 100,
-    backgroundColor: '#eee',
+    backgroundColor: '#4CAF50',
+    borderRadius: 50,
+    justifyContent: 'center',
+    padding: Platform.OS === 'web' ? 10 : width * 0.025,
   },
-  salaButtonSelected: {
-    backgroundColor: '#6A5ACD',
-  },
-  salaButtonText: {
-    fontSize: width * 0.035,
-    fontWeight: '600',
-    color: '#555',
-  },
-  salaButtonTextSelected: {
-    color: '#fff',
-  },
-  card: {
-    padding: width * 0.04,
-    marginBottom: height * 0.015,
-    borderRadius: width * 0.03,
+
+  backButton: {
     backgroundColor: '#fff',
+    borderRadius: 100,
+    elevation: 3,
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
+
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: Platform.OS === 'web' ? 12 : width * 0.03,
+    elevation: 1,
+    marginBottom: Platform.OS === 'web' ? 16 : height * 0.015,
+    padding: Platform.OS === 'web' ? 20 : width * 0.04,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    width: '100%',
+  },
+
+  cardActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Platform.OS === 'web' ? 10 : 0,
+    justifyContent: 'space-around',
+    marginTop: height * 0.01,
+  },
+
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+
   cardName: {
-    fontSize: width * 0.045,
+    fontSize: Platform.OS === 'web' ? 18 : width * 0.045,
     fontWeight: 'bold',
   },
-  positionText: {
-    fontSize: width * 0.04,
-    color: '#888',
-  },
+
   cardSubText: {
-    fontSize: width * 0.035,
     color: '#555',
+    fontSize: Platform.OS === 'web' ? 15 : width * 0.035,
   },
-  cardActions: {
+
+  colorCircle: {
+    borderColor: '#ccc',
+    borderRadius: 20,
+    borderWidth: 1,
+    height: 40,
+    width: 40,
+  },
+
+  colorOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: height * 0.01,
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'space-between',
   },
-  actionButton: {
-    padding: width * 0.025,
-    borderRadius: 50,
-    backgroundColor: '#4CAF50',
+
+  container: {
+    alignItems: 'center',
+    flex: 1,
+    paddingBottom: Platform.OS === 'web' ? 24 : height * 0.02,
+    paddingHorizontal: Platform.OS === 'web' ? 16 : width * 0.00,
+    paddingTop: Platform.OS === 'web' ? 32 : height * 0.08,
   },
-  modalOverlay: {
+
+  dropdownButton: {
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: '100%',
+  },
+
+  dropdownButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+
+  dropdownContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    maxHeight: height * 0.5,
+    padding: 20,
+    width: Platform.OS === 'web' ? 500 : '80%',
+  },
+
+  dropdownOption: {
+    borderBottomColor: '#ccc',
+    borderBottomWidth: 1,
+    paddingVertical: 12,
+  },
+
+  dropdownOptionText: {
+    color: '#333',
+    fontSize: 16,
+  },
+
+  dropdownOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
+
+historicoData: {
+  color: '#888',
+  fontSize: Platform.OS === 'web' ? 14 : width * 0.035,
+  marginTop: 4,
+},
+
+
+historicoItem: {
+  backgroundColor: '#f5f5f5',
+  borderRadius: 8,
+  marginBottom: 10,
+  padding: Platform.OS === 'web' ? 12 : 10,
+},
+
+historicoText: {
+  color: '#333',
+  fontSize: Platform.OS === 'web' ? 16 : width * 0.04,
+  fontWeight: 'bold',
+},
+
+
+  input: {
+  fontSize: Platform.OS === 'web' ? 16 : width * 0.04,
+  padding: 12,
+  backgroundColor: '#f9f9f9',
+  borderRadius: 8,
+  borderColor: '#ccc',
+  borderWidth: 1,
+  marginTop: 10,
+},
+
+modalCloseButton: {
+  flex: 1,
+  paddingVertical: Platform.OS === 'web' ? 12 : 8,
+  paddingHorizontal: Platform.OS === 'web' ? 24 : 20,
+  borderRadius: 6,
+  backgroundColor: '#ccc',
+  alignItems: 'center',
+},
+
+modalCloseText: {
+  fontSize: Platform.OS === 'web' ? 16 : width * 0.04,
+  color: '#333',
+  fontWeight: '500',
+},
+
   modalContainer: {
-    width: '80%',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: width * 0.045,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  colorOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  colorCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  modalCloseButton: {
-    marginTop: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    backgroundColor: '#ccc',
-  },
-  modalCloseText: {
-    fontSize: 16,
-    color: '#333',
+    width: Platform.OS === 'web' ? 600 : '80%',
   },
 
-  salaOptionButton: {
-    flexDirection: 'row',
+  modalOverlay: {
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  salaOptionText: {
-    fontSize: width * 0.04,
-    color: '#333',
-    fontWeight: '500',
-  },
-  
-
-  /* Modal do Histórico*/
-  historicoItem: {
-    marginBottom: 10,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  historicoText: {
-    fontSize: width * 0.04,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  respostaText: {
-    fontSize: width * 0.037,
-    color: '#555',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  historicoData: {
-    fontSize: width * 0.035,
-    color: '#888',
-    marginTop: 4,
-  },
-  
-  dropdownButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  
-  dropdownButtonText: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  
-  dropdownOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  
-  dropdownContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    width: '80%',
-    maxHeight: height * 0.5,
-  },
-  
-  dropdownOption: {
-    paddingVertical: 12,
-    borderBottomColor: '#ccc',
-    borderBottomWidth: 1,
-  },
-  
-  dropdownOptionText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  
 
+modalTitle: {
+  fontSize: Platform.OS === 'web' ? 26 : width * 0.045,
+  fontWeight: 'bold',
+  marginBottom: 15,
+  textAlign: 'center',
+},
+
+
+  positionText: {
+    color: '#888',
+    fontSize: Platform.OS === 'web' ? 14 : width * 0.04,
+  },
+
+respostaText: {
+  color: '#555',
+  fontSize: Platform.OS === 'web' ? 15 : width * 0.037,
+  fontStyle: 'italic',
+  marginTop: 4,
+},
+
+  salaButton: {
+    alignItems: 'center',
+    backgroundColor: '#eee',
+    borderRadius: 100,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginHorizontal: 6,
+    minWidth: Platform.OS === 'web' ? 100 : undefined,
+    paddingHorizontal: Platform.OS === 'web' ? 18 : width * 0.035,
+    paddingVertical: Platform.OS === 'web' ? 8 : height * 0.012,
+  },
+
+  salaButtonSelected: {
+    backgroundColor: '#6A5ACD',
+  },
+
+  salaButtonText: {
+    color: '#555',
+    fontSize: Platform.OS === 'web' ? 16 : width * 0.035,
+    fontWeight: '600',
+  },
+
+  salaButtonTextSelected: {
+    color: '#fff',
+  },
+
+salaOptionButton: {
+  alignItems: 'center',
+  backgroundColor: '#f5f5f5',
+  borderRadius: 8,
+  flexDirection: 'row',
+  marginBottom: 10,
+  paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
+  paddingVertical: Platform.OS === 'web' ? 10 : 12,
+},
+
+salaOptionText: {
+  color: '#333',
+  fontSize: Platform.OS === 'web' ? 18 : width * 0.04,
+  fontWeight: '500',
+},
+
+
+  salaSelectorContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 100,
+    elevation: 3,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 20,
+    paddingHorizontal: Platform.OS === 'web' ? 10 : 4,
+    paddingVertical: Platform.OS === 'web' ? 6 : 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    width: '100%',
+  },
+
+  selectorWrapper: {
+    marginBottom: height * 0.02,
+  },
+
+  topBar: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: Platform.OS === 'web' ? 20 : 10,
+    maxWidth: 700,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+
+  topBarTitle: {
+    color: '#333',
+    flex: 1,
+    fontSize: Platform.OS === 'web' ? 26 : width * 0.055,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  wrapper: {
+    alignSelf: 'center',
+    maxWidth: 700,
+    width: '100%',
+  },
 });
+
 
 export default WaitingQueue;

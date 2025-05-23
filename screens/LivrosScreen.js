@@ -1,42 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Modal,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Alert,
-  ScrollView,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import { getAuth } from 'firebase/auth';
-import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
-import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, TextInput, StyleSheet, Dimensions, Platform, Modal, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Icon from 'react-native-vector-icons/FontAwesome';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import { router } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
-import { useRouter } from 'expo-router';
-
+import { getAuth } from 'firebase/auth';
+import { db } from './firebaseConfig';
+import { collection, getDocs, addDoc, updateDoc, doc, where, query } from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LivrosScreen() {
   const [busca, setBusca] = useState('');
   const [livros, setLivros] = useState([]);
-  const [carregando, setCarregando] = useState(true);
   const [livroExpandido, setLivroExpandido] = useState(null);
-  const [perfilUsuario, setPerfilUsuario] = useState('');
-  const [tabSelecionada, setTabSelecionada] = useState(0);
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  // Estados para novo livro
   const [modalVisible, setModalVisible] = useState(false);
+  const [tabSelecionada, setTabSelecionada] = useState(0);
+  const [perfilUsuario, setPerfilUsuario] = useState('');
+  const auth = getAuth();
   const [novoTitulo, setNovoTitulo] = useState('');
   const [novoAutor, setNovoAutor] = useState('');
   const [novoLinkPDF, setNovoLinkPDF] = useState('');
@@ -46,159 +30,73 @@ export default function LivrosScreen() {
   const [novoVendaDisponivel, setNovoVendaDisponivel] = useState(false);
   const [novoEmprestimoDisponivel, setNovoEmprestimoDisponivel] = useState(false);
 
-  const router = useRouter();
-
-
-  const verificarPermissao = async () => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const q = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          const dados = querySnapshot.docs[0].data();
-          setPerfilUsuario(dados.perfil);
-        } else {
-          console.log('Usuário não encontrado no Firestore');
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao buscar perfil do usuário:', error);
-    }
-  };
-
   useEffect(() => {
-    const carregarLivros = async () => {
-      try {
-        const snapshot = await getDocs(collection(db, 'bzmLivro'));
-        const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setLivros(lista);
-      } catch (error) {
-        console.error('❌ Erro ao buscar livros:', error);
-      } finally {
-        setCarregando(false);
-      }
-    };
-
     carregarLivros();
-    verificarPermissao();  // 🔥 Só chama, não recria
+    verificarPermissao();
   }, []);
 
-
-  const compartilharPDF = async (livro) => {
-    try {
-      const nomeArquivo = livro.titulo.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.pdf';
-      const fileUri = FileSystem.documentDirectory + nomeArquivo;
-
-      const downloadResumable = FileSystem.createDownloadResumable(
-        livro.linkPDF,
-        fileUri
-      );
-
-      const { uri } = await downloadResumable.downloadAsync();
-      console.log('✅ Arquivo salvo em:', uri);
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
-      } else {
-        Alert.alert('Download concluído!', `O arquivo foi salvo em:\n${uri}`);
-      }
-    } catch (error) {
-      console.error('Erro ao baixar PDF:', error);
-      Alert.alert('Erro', 'Não foi possível baixar o PDF.');
-    }
+  const carregarLivros = async () => {
+    const snapshot = await getDocs(collection(db, 'bzmLivro'));
+    const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    setLivros(lista);
   };
 
-  const baixarPDF = async (livro) => {
-    try {
-      const nomeArquivo = `${livro.titulo.replace(/\s+/g, '_')}.pdf`;
-      const fileUri = FileSystem.documentDirectory + nomeArquivo;
-
-      const download = FileSystem.createDownloadResumable(livro.linkPDF, fileUri);
-      const { uri } = await download.downloadAsync();
-
-      if (!uri) throw new Error('Falha ao baixar o PDF.');
-
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(uri, {
-          dialogTitle: 'Escolha onde salvar seu PDF',
-        });
-      } else {
-        Alert.alert('Erro', 'O compartilhamento não está disponível neste dispositivo.');
+  const verificarPermissao = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      const q = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const dados = querySnapshot.docs[0].data();
+        setPerfilUsuario(dados.perfil);
       }
-    } catch (err) {
-      console.error('❌ Erro ao salvar:', err);
-      Alert.alert('Erro', 'Não foi possível salvar o PDF.');
     }
   };
-
 
   const filtroLivros = () => {
     const filtrados = livros.filter(
-      (livro) =>
-        livro.titulo.toLowerCase().includes(busca.toLowerCase()) ||
-        livro.autor.toLowerCase().includes(busca.toLowerCase())
+      (livro) => livro.titulo.toLowerCase().includes(busca.toLowerCase()) || livro.autor.toLowerCase().includes(busca.toLowerCase())
     );
-
     if (tabSelecionada === 0) return filtrados.filter((livro) => livro.temPDF);
     if (tabSelecionada === 1) return filtrados.filter((livro) => livro.emprestimoDisponivel);
     if (tabSelecionada === 2) return filtrados.filter((livro) => livro.vendaDisponivel);
     return filtrados;
   };
 
-  const toggleEmprestimo = async (livro) => {
-    const livroRef = doc(db, 'bzmLivro', livro.id);
-    const novoEstado = !livro.emprestado;
-    try {
-      await updateDoc(livroRef, {
-        emprestado: novoEstado,
-        emprestadoPara: novoEstado ? '1744840882517' : '',
-        dataEmprestimo: novoEstado ? new Date().toISOString() : '',
-        dataDevolucaoPrevista: novoEstado ? new Date(Date.now() + 7 * 86400000).toISOString() : '',
-      });
-      setLivros((prev) =>
-        prev.map((l) => (l.id === livro.id ? { ...l, emprestado: novoEstado } : l))
-      );
-    } catch (err) {
-      Alert.alert('Erro', 'Não foi possível atualizar o estado de empréstimo.');
-    }
+  const abrirLivroPDF = (livro) => {
+    router.push({
+      pathname: '/Rota_LeitorPDFScreen',
+      params: { pdfUrl: livro.linkPDF, titulo: livro.titulo },
+    });
   };
 
-  const removerLivro = async (livro) => {
-    Alert.alert('Remover Livro', `Deseja remover "${livro.titulo}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover', style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteDoc(doc(db, 'bzmLivro', livro.id));
-            setLivros((prev) => prev.filter((l) => l.id !== livro.id));
-          } catch (err) {
-            Alert.alert('Erro', 'Não foi possível remover o livro.');
-          }
-        },
-      },
-    ]);
+  const baixarPDF = async (livro) => {
+    if (Platform.OS === 'web') {
+      const link = document.createElement('a');
+      link.href = livro.linkPDF;
+      link.download = `${livro.titulo}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const fileUri = FileSystem.documentDirectory + `${livro.titulo}.pdf`;
+      const downloadResumable = FileSystem.createDownloadResumable(livro.linkPDF, fileUri);
+      await downloadResumable.downloadAsync();
+      await Sharing.shareAsync(fileUri);
+    }
   };
 
   const renderItem = ({ item }) => {
     const expandido = livroExpandido === item.id;
-
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() => setLivroExpandido(expandido ? null : item.id)}
-        activeOpacity={0.8}
       >
-        <Text style={styles.titulo}>{item.titulo}</Text>
-        <Text style={styles.autor}>Autor: {item.autor}</Text>
-
-        {item.vendaDisponivel && tabSelecionada === 2 && (
-          <Text style={styles.precoLivro}>💰 R$ {item.precoVenda.toFixed(2)}</Text>
-        )}
-
+        <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+          <Text style={styles.titulo}>{item.titulo}</Text>
+          <Text style={styles.autor}>Autor: {item.autor}</Text>
+        </View>
 
         {expandido && (
           <View style={styles.botoes}>
@@ -212,35 +110,6 @@ export default function LivrosScreen() {
                 <Icon name="download" size={18} color="#fff" />
               </TouchableOpacity>
             )}
-            {item.temPDF && (
-              <TouchableOpacity
-                onPress={() => compartilharPDF(item)}
-                style={styles.botaoCompartilhar}
-              >
-                <Icon name="share" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
-            {item.emprestimoDisponivel && (
-              <TouchableOpacity
-                onPress={() => toggleEmprestimo(item)}
-                style={[
-                  styles.botaoEmprestimoTexto,
-                  { backgroundColor: item.emprestado ? '#dc2626' : '#22c55e' },
-                ]}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                  {item.emprestado ? 'Devolver' : 'Emprestar'}
-                </Text>
-              </TouchableOpacity>
-            )}
-            {(perfilUsuario === 'admin') && (
-              <TouchableOpacity
-                onPress={() => removerLivro(item)}
-                style={styles.botaoRemover}
-              >
-                <Icon name="trash" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
           </View>
         )}
       </TouchableOpacity>
@@ -248,182 +117,167 @@ export default function LivrosScreen() {
   };
 
   const adicionarLivro = async () => {
-    if (!novoTitulo.trim() || !novoAutor.trim()) {
-      Alert.alert('Erro', 'Preencha o título e o autor.');
-      return;
-    }
+  if (!novoTitulo.trim() || !novoAutor.trim()) {
+    Alert.alert('Erro', 'Preencha o título e o autor.');
+    return;
+  }
 
-    try {
-      await addDoc(collection(db, 'bzmLivro'), {
-        titulo: novoTitulo,
-        autor: novoAutor,
-        linkPDF: novoLinkPDF || '',
-        precoVenda: novoPrecoVenda ? parseFloat(novoPrecoVenda) : 0,
-        estoque: novoEstoque ? parseInt(novoEstoque) : 0,
-        temPDF: novoTemPDF,
-        vendaDisponivel: novoVendaDisponivel,
-        emprestimoDisponivel: novoEmprestimoDisponivel,
-        emprestado: false,
-        emprestadoPara: '',
-        dataEmprestimo: '',
-        dataDevolucaoPrevista: '',
-      });
-
-      Alert.alert('Sucesso', 'Livro adicionado!');
-      setModalVisible(false);
-
-      // Limpar campos
-      setNovoTitulo('');
-      setNovoAutor('');
-      setNovoLinkPDF('');
-      setNovoPrecoVenda('');
-      setNovoEstoque('');
-      setNovoTemPDF(false);
-      setNovoVendaDisponivel(false);
-      setNovoEmprestimoDisponivel(false);
-
-      // Atualizar lista
-      const snapshot = await getDocs(collection(db, 'bzmLivro'));
-      const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setLivros(lista);
-    } catch (error) {
-      console.error('Erro ao adicionar livro:', error);
-      Alert.alert('Erro', 'Não foi possível adicionar o livro.');
-    }
-  };
-
-
-  const abrirLivroPDF = (livro) => {
-    if (!livro.linkPDF) {
-      Alert.alert('Erro', 'Este livro não possui link de PDF.');
-      return;
-    }
-  
-    router.push({
-      pathname: '/Rota_LeitorPDFScreen', // 🔥 aqui chama a tela certa
-      params: { pdfUrl: livro.linkPDF, titulo: livro.titulo }, // 🔥 envia com os nomes corretos
+  try {
+    await addDoc(collection(db, 'bzmLivro'), {
+      titulo: novoTitulo,
+      autor: novoAutor,
+      linkPDF: novoLinkPDF || '',
+      precoVenda: novoPrecoVenda ? parseFloat(novoPrecoVenda) : 0,
+      estoque: novoEstoque ? parseInt(novoEstoque) : 0,
+      temPDF: novoTemPDF,
+      vendaDisponivel: novoVendaDisponivel,
+      emprestimoDisponivel: novoEmprestimoDisponivel,
+      emprestado: false,
+      emprestadoPara: '',
+      dataEmprestimo: '',
+      dataDevolucaoPrevista: '',
     });
-  };
-  
 
+    Alert.alert('Sucesso', 'Livro adicionado!');
+    setModalVisible(false);
+
+    // Limpar campos:
+    setNovoTitulo('');
+    setNovoAutor('');
+    setNovoLinkPDF('');
+    setNovoPrecoVenda('');
+    setNovoEstoque('');
+    setNovoTemPDF(false);
+    setNovoVendaDisponivel(false);
+    setNovoEmprestimoDisponivel(false);
+
+    // Atualiza a lista:
+    const snapshot = await getDocs(collection(db, 'bzmLivro'));
+    const lista = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    setLivros(lista);
+  } catch (error) {
+    console.error('Erro ao adicionar livro:', error);
+    Alert.alert('Erro', 'Não foi possível adicionar o livro.');
+  }
+};
+  
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerWrapper}>
-        <Text style={styles.headerTitle}>📚 Biblioteca</Text>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <ArrowLeft size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>📚 Biblioteca</Text>
+        </View>
+
+        <SegmentedControl
+          values={['PDF', 'Empréstimo', 'Venda']}
+          selectedIndex={tabSelecionada}
+          onChange={(e) => setTabSelecionada(e.nativeEvent.selectedSegmentIndex)}
+          style={styles.segmented}
+        />
+
+        <TextInput
+          placeholder="Buscar por título ou autor"
+          value={busca}
+          onChangeText={setBusca}
+          style={styles.input}
+        />
+
+        <FlatList
+          data={filtroLivros()}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 80 }}
+          ListEmptyComponent={<Text style={styles.emptyText}>Nenhum livro encontrado.</Text>}
+          showsVerticalScrollIndicator={false}
+        />
       </View>
 
-      <SegmentedControl
-        values={["PDF", "Empréstimo", "Venda"]}
-        selectedIndex={tabSelecionada}
-        onChange={(event) => setTabSelecionada(event.nativeEvent.selectedSegmentIndex)}
-        style={styles.segmented}
-      />
+      <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
+        <Ionicons name="add" size={32} color="#fff" />
+      </TouchableOpacity>
+
+<Modal
+  visible={modalVisible}
+  transparent
+  onRequestClose={() => setModalVisible(false)}
+  animationType="slide"
+>
+  <View style={styles.modalContainer}>
+    <ScrollView contentContainerStyle={styles.modalContent}>
+      <Text style={styles.modalTitle}>Adicionar Novo Livro</Text>
 
       <TextInput
-        placeholder="Buscar por título ou autor"
-        value={busca}
-        onChangeText={setBusca}
-        style={styles.input}
+        style={styles.modalInput}
+        placeholder="Título"
+        value={novoTitulo}
+        onChangeText={setNovoTitulo}
       />
-      <FlatList
-        data={filtroLivros()}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nenhum livro encontrado.</Text>}
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Autor"
+        value={novoAutor}
+        onChangeText={setNovoAutor}
       />
-      {(perfilUsuario === 'admin' || perfilUsuario === 'administrador') && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => setModalVisible(true)}
-        >
-          <Ionicons name="add" size={32} color="#fff" />
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Link do PDF"
+        value={novoLinkPDF}
+        onChangeText={setNovoLinkPDF}
+      />
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Preço de Venda"
+        keyboardType="numeric"
+        value={novoPrecoVenda}
+        onChangeText={setNovoPrecoVenda}
+      />
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Estoque"
+        keyboardType="numeric"
+        value={novoEstoque}
+        onChangeText={setNovoEstoque}
+      />
+
+      <View style={styles.switchRow}>
+        <Text>Tem PDF:</Text>
+        <TouchableOpacity onPress={() => setNovoTemPDF(!novoTemPDF)}>
+          <Ionicons name={novoTemPDF ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoTemPDF ? "#22c55e" : "#ccc"} />
         </TouchableOpacity>
-      )}
+      </View>
 
-      <Modal
-        animationType="slide"
-        transparent
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>Adicionar Novo Livro</Text>
+      <View style={styles.switchRow}>
+        <Text>Disponível para Venda:</Text>
+        <TouchableOpacity onPress={() => setNovoVendaDisponivel(!novoVendaDisponivel)}>
+          <Ionicons name={novoVendaDisponivel ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoVendaDisponivel ? "#22c55e" : "#ccc"} />
+        </TouchableOpacity>
+      </View>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Título"
-              value={novoTitulo}
-              onChangeText={setNovoTitulo}
-            />
+      <View style={styles.switchRow}>
+        <Text>Disponível para Empréstimo:</Text>
+        <TouchableOpacity onPress={() => setNovoEmprestimoDisponivel(!novoEmprestimoDisponivel)}>
+          <Ionicons name={novoEmprestimoDisponivel ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoEmprestimoDisponivel ? "#22c55e" : "#ccc"} />
+        </TouchableOpacity>
+      </View>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Autor"
-              value={novoAutor}
-              onChangeText={setNovoAutor}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Link do PDF"
-              value={novoLinkPDF}
-              onChangeText={setNovoLinkPDF}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Preço de Venda"
-              keyboardType="numeric"
-              value={novoPrecoVenda}
-              onChangeText={setNovoPrecoVenda}
-            />
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Estoque"
-              keyboardType="numeric"
-              value={novoEstoque}
-              onChangeText={setNovoEstoque}
-            />
-
-            <View style={styles.switchRow}>
-              <Text>Tem PDF:</Text>
-              <TouchableOpacity onPress={() => setNovoTemPDF(!novoTemPDF)}>
-                <Ionicons name={novoTemPDF ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoTemPDF ? "#22c55e" : "#ccc"} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.switchRow}>
-              <Text>Disponível para Venda:</Text>
-              <TouchableOpacity onPress={() => setNovoVendaDisponivel(!novoVendaDisponivel)}>
-                <Ionicons name={novoVendaDisponivel ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoVendaDisponivel ? "#22c55e" : "#ccc"} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.switchRow}>
-              <Text>Disponível para Empréstimo:</Text>
-              <TouchableOpacity onPress={() => setNovoEmprestimoDisponivel(!novoEmprestimoDisponivel)}>
-                <Ionicons name={novoEmprestimoDisponivel ? "checkmark-circle" : "ellipse-outline"} size={28} color={novoEmprestimoDisponivel ? "#22c55e" : "#ccc"} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.modalButton} onPress={adicionarLivro}>
-                <Text style={styles.modalButtonText}>Salvar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#ccc' }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
+      <View style={styles.modalButtons}>
+        <TouchableOpacity style={styles.modalButton} onPress={adicionarLivro}>
+          <Text style={styles.modalButtonText}>Salvar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modalButton, { backgroundColor: '#ccc' }]}
+          onPress={() => setModalVisible(false)}
+        >
+          <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  </View>
+</Modal>
 
     </View>
   );
@@ -433,53 +287,60 @@ const styles = StyleSheet.create({
   container: {
     paddingTop: height * 0.05,
     flex: 1,
-    paddingHorizontal: width * 0.05,
-    paddingBottom: height * 0.05,
     backgroundColor: '#f7f7f7',
-  },
-  headerWrapper: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: height * 0.02,
   },
-  headerTitle: { paddingTop: height * 0.05, fontSize: width * 0.06, fontWeight: 'bold', textAlign: 'center', marginBottom: height * 0.02 },
+  content: {
+    width: '90%',
+    maxWidth: 800,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontSize: Platform.OS === 'web' ? 28 : width * 0.05,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  segmented: {
+    marginBottom: 12,
+  },
   input: {
-    height: height * 0.06,
+    height: 40,
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 12,
-    textAlign: 'center',
-    paddingHorizontal: width * 0.04,
-    marginVertical: height * 0.015,
-    fontSize: width * 0.04,
+    paddingHorizontal: 12,
     backgroundColor: '#fff',
-  },
-  segmented: {
-    marginBottom: height * 0.02,
+    marginBottom: 12,
   },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: width * 0.04,
-    marginBottom: height * 0.015,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
+    width: '100%',
   },
   titulo: {
-    fontSize: width * 0.045,
+    fontSize: Platform.OS === 'web' ? 20 : width * 0.045,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   autor: {
-    fontSize: width * 0.038,
+    fontSize: Platform.OS === 'web' ? 18 : width * 0.038,
     color: '#555',
   },
   botoes: {
     flexDirection: 'row',
-    marginTop: height * 0.015,
+    marginTop: 8,
   },
   botaoLer: {
     backgroundColor: '#6A5ACD',
@@ -493,42 +354,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginRight: 10,
   },
-  botaoEmprestimo: {
-    padding: 10,
-    borderRadius: 10,
-    marginRight: 10,
-  },
-  botaoEmprestimoTexto: {
-    padding: 10,
-    borderRadius: 10,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 80,
-  },
-  botaoCompartilhar: {
-    backgroundColor: '#3B82F6', // azul
-    padding: 10,
-    borderRadius: 10,
-    marginRight: 10,
-  },
-  botaoRemover: {
-    backgroundColor: '#DC2626',
-    padding: 10,
-    borderRadius: 10,
-  },
-  precoLivro: {
-    fontSize: width * 0.042,
-    fontWeight: '600',
-    color: '#22c55e',
-    marginTop: 4,
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: height * 0.1,
-    fontSize: width * 0.04,
-    color: '#777',
-  },
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -538,53 +363,57 @@ const styles = StyleSheet.create({
     padding: 15,
     elevation: 5,
   },
-  modalContainer: {
-    paddingTop: height * 0.06,
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    width: '85%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  emptyText: {
+    marginTop: 20,
+    color: '#777',
     textAlign: 'center',
   },
-  modalInput: {
-    backgroundColor: '#f1f1f1',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  modalButton: {
-    flex: 1,
-    backgroundColor: '#6A5ACD',
-    borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 5,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
+modalContainer: {
+  paddingTop: height * 0.06,
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+modalContent: {
+  backgroundColor: '#fff',
+  padding: 20,
+  borderRadius: 12,
+  width: '85%',
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: 'bold',
+  marginBottom: 15,
+  textAlign: 'center',
+},
+modalInput: {
+  backgroundColor: '#f1f1f1',
+  borderRadius: 8,
+  padding: 10,
+  marginBottom: 10,
+},
+modalButtons: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 10,
+},
+modalButton: {
+  flex: 1,
+  backgroundColor: '#6A5ACD',
+  borderRadius: 8,
+  padding: 10,
+  marginHorizontal: 5,
+  alignItems: 'center',
+},
+modalButtonText: {
+  color: '#fff',
+  fontWeight: 'bold',
+},
+switchRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+}
 });

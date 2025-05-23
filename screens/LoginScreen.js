@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator,Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -15,6 +15,8 @@ import { AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native'; // << Adicionado aqui
 
+
+
 const { width, height } = Dimensions.get('window');
 WebBrowser.maybeCompleteAuthSession();
 
@@ -23,6 +25,15 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false); // << Novo estado para controlar animação
+  const [modalVisible, setModalVisible] = useState(false);
+  const [novoTitulo, setNovoTitulo] = useState('');
+  const [novoAutor, setNovoAutor] = useState('');
+  const [novoLinkPDF, setNovoLinkPDF] = useState('');
+  const [novoPrecoVenda, setNovoPrecoVenda] = useState('');
+  const [novoEstoque, setNovoEstoque] = useState('');
+  const [novoTemPDF, setNovoTemPDF] = useState(false);
+  const [novoVendaDisponivel, setNovoVendaDisponivel] = useState(false);
+  const [novoEmprestimoDisponivel, setNovoEmprestimoDisponivel] = useState(false);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: 'SEUS_CLIENT_IDS_AQUI',
@@ -138,15 +149,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: width * 0.05,
+    alignItems: 'center',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 20,
   },
   logo: {
-    width: width * 0.8,
-    height: width * 0.8,
+    width: Platform.OS === 'web' ? 300 : width * 0.7,
+    height: Platform.OS === 'web' ? 300 : width * 0.7,
     marginBottom: 20,
-    paddingTop: height * 0.45,
+    marginTop: Platform.OS === 'web' ? 20 : height * 0.05,
   },
   formBox: {
     width: '100%',
+    maxWidth: 400, // << para não ficar largo demais no web
     paddingHorizontal: 10,
   },
   loginBtn: {
@@ -192,12 +212,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#007AFF',
     textAlign: 'center',
-  },
-  scrollContainer: {
-    paddingBottom: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexGrow: 1,
   },
   footer: {
     marginTop: 30,

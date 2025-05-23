@@ -8,6 +8,8 @@ import {
   Image,
   FlatList,
   Animated,
+  Platform,
+  ScrollView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAuth,signOut  } from 'firebase/auth';
@@ -129,71 +131,80 @@ export default function HomeFuncionario() {
   
 
   return (
-    <View style={styles.container}>
-      {/* Botão de abrir Drawer */}
-      <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
-        <Ionicons name="menu" size={28} color="#333" />
+  <View style={{ flex: 1 }}>
+    {/* Botão de abrir Drawer */}
+    <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
+      <Ionicons name="menu" size={28} color="#333" />
+    </TouchableOpacity>
+
+    {/* Drawer lateral */}
+    {drawerOpen && (
+      <TouchableOpacity style={styles.overlay} onPress={closeDrawer} activeOpacity={1}>
+        <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
+<View style={styles.logoContainer}>
+  <Image
+    source={require('../assets/logo.png')}
+    style={styles.drawerLogo}
+    resizeMode="contain"
+  />
+</View>
+
+          {drawerItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.drawerItemContainer}
+              onPress={() => handleDrawerItemPress(item.action)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.drawerItem}>
+                <View style={styles.iconCircle}>
+                  <Ionicons name={item.icon} size={20} color="#6A5ACD" />
+                </View>
+                <Text style={styles.drawerText}>{item.label}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </Animated.View>
       </TouchableOpacity>
-  
-      {/* Drawer lateral */}
-      {drawerOpen && (
-        <TouchableOpacity style={styles.overlay} onPress={closeDrawer} activeOpacity={1}>
-  <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
-    
+    )}
 
-    <View style={styles.logoContainer}>
-      <Image
-        source={require('../assets/logo.png')}  // ajuste o caminho da sua logo
-        style={styles.logo}
-        resizeMode="contain"
-      />
-    </View>
-
-    {/* 🔥 MENUS ABAIXO */}
-    {drawerItems.map((item, index) => (
-  <TouchableOpacity
-    key={index}
-    style={styles.drawerItemContainer}
-    onPress={() => handleDrawerItemPress(item.action)}
-    activeOpacity={0.7}
-  >
-    <View style={styles.drawerItem}>
-      <View style={styles.iconCircle}>
-        <Ionicons name={item.icon} size={20} color="#6A5ACD" />
+    {/* Conteúdo com rolagem */}
+    <ScrollView
+      contentContainerStyle={{
+        flexGrow: 1,
+        alignItems: 'center',
+        paddingBottom: 40,
+        paddingTop: Platform.OS === 'web' ? 60 : height * 0.05,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ width: '100%', maxWidth: 700 }}>
+        <Text style={styles.title}>👋 Olá, {primeiroNome}!</Text>
+        <Text style={styles.subtitle}>Tenha um excelente dia de trabalho 🙏</Text>
+        <FlatList
+          data={menuItems}
+          keyExtractor={(item) => item.label}
+          numColumns={2}
+          renderItem={renderItem}
+          contentContainerStyle={styles.gridContainer}
+          scrollEnabled={false} // Desativa rolagem interna, pois já temos ScrollView
+        />
       </View>
-      <Text style={styles.drawerText}>{item.label}</Text>
-    </View>
-  </TouchableOpacity>
-))}
+    </ScrollView>
+  </View>
+);
 
-  </Animated.View>
-</TouchableOpacity>
-
-      )}
-  
-      {/* Conteúdo da Home */}
-      <Text style={styles.title}>👋 Olá, {primeiroNome}!</Text>
-      <Text style={styles.subtitle}>Tenha um excelente dia de trabalho 🙏</Text>
-      <FlatList
-        data={menuItems}
-        keyExtractor={(item) => item.label}
-        numColumns={2}
-        renderItem={renderItem}
-        contentContainerStyle={styles.gridContainer}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
   
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f2f4f8',
-    paddingTop: height * 0.05, 
-    paddingHorizontal: width * 0.04,
-  }, 
+container: {
+  flex: 1,
+  backgroundColor: '#f2f4f8',
+  paddingTop: Platform.OS === 'web' ? 40 : height * 0.05,
+  paddingHorizontal: Platform.OS === 'web' ? 32 : width * 0.04,
+  alignItems: 'center',
+},
   menuButton: {
     position: 'absolute',
     top: 40,
@@ -205,17 +216,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
     zIndex: 20,
   },
-  drawer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: width * 0.6,
-    backgroundColor: '#eef2ff',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    zIndex: 30,
-  },
+drawer: {
+  position: 'absolute',
+  top: 0,
+  bottom: 0,
+  left: 0,
+  width: Platform.OS === 'web' ? 300 : width * 0.6,
+  backgroundColor: '#eef2ff',
+  paddingTop: 60,
+  paddingHorizontal: 20,
+  zIndex: 30,
+},
+
   drawerItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,50 +238,54 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: '#333',
   },
-  title: {
-    fontSize: width * 0.06,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginTop: 30,
-  },
-  subtitle: {
-    fontSize: width * 0.04,
-    textAlign: 'center',
-    color: '#666',
-    marginBottom: height * 0.03,
-  },
+title: {
+  fontSize: Platform.OS === 'web' ? 28 : width * 0.06,
+  fontWeight: 'bold',
+  color: '#333',
+  textAlign: 'center',
+  marginTop: 30,
+},
+subtitle: {
+  fontSize: Platform.OS === 'web' ? 18 : width * 0.04,
+  textAlign: 'center',
+  color: '#666',
+  marginBottom: height * 0.03,
+},
   gridContainer: {
     paddingBottom: height * 0.1,
     marginTop: 8,
   },
-  card: {
-    flex: 1,
-    margin: width * 0.02,
-    backgroundColor: '#6A5ACD',
-    borderRadius: 12,
-    padding: width * 0.04,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: height * 0.18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+card: {
+  flex: 1,
+  margin: Platform.OS === 'web' ? 10 : width * 0.02,
+  backgroundColor: '#6A5ACD',
+  borderRadius: 12,
+  padding: Platform.OS === 'web' ? 24 : width * 0.04,
+  alignItems: 'center',
+  justifyContent: 'center',
+  minHeight: Platform.OS === 'web' ? 150 : height * 0.18,
+  maxWidth: Platform.OS === 'web' ? 300 : undefined,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 4,
+  elevation: 3,
+},
+
   icon: {
     marginBottom: height * 0.01,
   },
-  cardText: {
-    fontSize: width * 0.04,
-    color: '#fff',
-    textAlign: 'center',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: height * 0.03,
-  },
+cardText: {
+  fontSize: Platform.OS === 'web' ? 16 : width * 0.04,
+  color: '#fff',
+  textAlign: 'center',
+},
+logoContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 20,
+},
+
   logo: {
     width: width * 0.4,
     height: width * 0.4,
@@ -305,5 +321,10 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
+  drawerLogo: {
+  width: Platform.OS === 'web' ? 250 : width * 0.3,
+  height: Platform.OS === 'web' ? 250 : width * 0.3,
+  marginBottom: 20,
+},
   
 });

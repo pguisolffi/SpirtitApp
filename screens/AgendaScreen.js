@@ -9,24 +9,17 @@ import {
   StyleSheet,
   Modal,
   Alert,
+  Platform
 } from "react-native";
 import CalendarPicker from "react-native-calendar-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { auth } from "./firebaseConfig"; // Certifique-se de importar corretamente
-import {
-  collection,
-  doc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDoc,
-  query,
-  where,
-  onSnapshot,
-} from "firebase/firestore";
+import {collection,doc,getDocs,addDoc,updateDoc,deleteDoc,getDoc,query,where,onSnapshot,} from "firebase/firestore";
 import { db } from "./firebaseConfig";
+import { router } from 'expo-router';
+import { ArrowLeft } from 'lucide-react-native';
+
 
 const { width, height } = Dimensions.get("window");
 
@@ -217,7 +210,19 @@ export default function Agenda() {
   const eventosDoDia = eventos[dataChave] || [];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <View style={{
+  alignSelf: 'center',
+  width: '100%',
+  maxWidth: Platform.OS === 'web' ? 600 : '100%'
+}}>
+
+  <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
+<TouchableOpacity onPress={() => router.back()}>
+  <ArrowLeft size={24} color="#333" />
+</TouchableOpacity>
+</View>
+
       <Text style={styles.titulo}>Agenda de Eventos</Text>
 
       <View style={styles.header}>
@@ -278,7 +283,7 @@ export default function Agenda() {
           </TouchableOpacity>
         </View>
       )}
-
+      <View style={{ alignSelf: 'center', width: Platform.OS === 'web' ? 400 : '100%' }}>
       <CalendarPicker
         onDateChange={(date) => setDataSelecionada(new Date(date))}
         selectedStartDate={dataSelecionada}
@@ -302,6 +307,7 @@ export default function Agenda() {
         selectedDayColor="#4f46e5"
         selectedDayTextColor="#fff"
       />
+      </View>
 
       <View style={styles.eventos}>
         {eventosDoDia.length === 0 ? (
@@ -443,31 +449,131 @@ export default function Agenda() {
           </View>
         </View>
       </Modal>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { paddingTop: height * 0.1, padding: 16, backgroundColor: "#fff" },
-  titulo: { fontSize: 26, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
-  subtitulo: { fontSize: 18, fontWeight: "600" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  botaoNovo: { backgroundColor: "#4f46e5", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
-  botaoSalvar: { backgroundColor: "#16a34a", padding: 10, borderRadius: 6, marginTop: 8 },
-  botaoEditar: { backgroundColor: "#eab308", padding: 10, borderRadius: 6, marginTop: 10 },
-  botaoCancelar: { backgroundColor: "#e5e7eb", padding: 10, borderRadius: 6 },
-  botaoTexto: { color: "#fff", fontWeight: "bold", textAlign: "center" },
-  formulario: { backgroundColor: "#f3f4f6", padding: 16, borderRadius: 8, marginBottom: 16 },
-  input: { borderWidth: 1, borderColor: "#ccc", padding: 8, borderRadius: 6, marginBottom: 8 },
-  textarea: { height: 80, textAlignVertical: "top" },
-  eventos: { marginTop: 16 },
-  cartaoEvento: { borderWidth: 1, borderColor: "#e5e7eb", padding: 12, borderRadius: 6, marginBottom: 8, backgroundColor: "#fff", elevation: 2 },
-  eventoTitulo: { fontSize: 16, fontWeight: "bold" },
-  eventoInfo: { fontSize: 14, color: "#4b5563" },
-  eventoDescricao: { marginTop: 4, fontSize: 14, color: "#374151" },
-  semEvento: { color: "#6b7280", fontStyle: "italic", marginTop: 8 },
-  modalFundo: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" },
-  modalConteudo: { backgroundColor: "#fff", padding: 20, borderRadius: 10, width: "90%" },
+container: {
+  paddingTop: Platform.OS === 'web' ? 20 : height * 0.1,
+  paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
+  backgroundColor: "#fff",
+  flex: 1,
+  width: "100%",
+  alignSelf: "center",
+  maxWidth: Platform.OS === 'web' ? 1000 : "100%",  // ← aumenta o conteúdo no web
+},
+
+
+
+titulo: {
+  fontSize: Platform.OS === 'web' ? 32 : 26,
+  fontWeight: "bold",
+  marginBottom: 16,
+  textAlign: "center",
+},
+subtitulo: {
+  fontSize: Platform.OS === 'web' ? 14 : 18,
+  fontWeight: "600",
+},
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+botaoNovo: {
+  backgroundColor: "#4f46e5",
+  paddingHorizontal: Platform.OS === 'web' ? 8 : 12,
+  paddingVertical: Platform.OS === 'web' ? 6 : 8,
+  borderRadius: Platform.OS === 'web' ? 4 : 6,
+},
+  botaoSalvar: {
+    backgroundColor: "#16a34a",
+    padding: Platform.OS === 'web' ? 12 : 10,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  botaoEditar: {
+    backgroundColor: "#eab308",
+    padding: Platform.OS === 'web' ? 12 : 10,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  botaoCancelar: {
+    backgroundColor: "#e5e7eb",
+    padding: Platform.OS === 'web' ? 12 : 10,
+    borderRadius: 6,
+  },
+  botaoTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
+    fontSize: Platform.OS === 'web' ? 16 : 14,
+  },
+  formulario: {
+    backgroundColor: "#f3f4f6",
+    padding: Platform.OS === 'web' ? 20 : 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+input: {
+  borderWidth: 1,
+  borderColor: "#ccc",
+  padding: Platform.OS === 'web' ? 8 : 12,
+  borderRadius: Platform.OS === 'web' ? 4 : 6,
+  marginBottom: Platform.OS === 'web' ? 6 : 8,
+  fontSize: Platform.OS === 'web' ? 14 : 16,
+},
+textarea: {
+  height: Platform.OS === 'web' ? 60 : 100,
+  textAlignVertical: "top",
+},
+  eventos: {
+    marginTop: 16,
+  },
+cartaoEvento: {
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  padding: Platform.OS === 'web' ? 8 : 12,
+  borderRadius: Platform.OS === 'web' ? 4 : 6,
+  marginBottom: Platform.OS === 'web' ? 6 : 8,
+  backgroundColor: "#fff",
+  elevation: 1,
+},
+  eventoTitulo: {
+    fontSize: Platform.OS === 'web' ? 18 : 16,
+    fontWeight: "bold",
+  },
+  eventoInfo: {
+    fontSize: Platform.OS === 'web' ? 16 : 14,
+    color: "#4b5563",
+  },
+  eventoDescricao: {
+    marginTop: 4,
+    fontSize: Platform.OS === 'web' ? 16 : 14,
+    color: "#374151",
+  },
+  semEvento: {
+    color: "#6b7280",
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  modalFundo: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+modalConteudo: {
+  backgroundColor: "#fff",
+  padding: Platform.OS === 'web' ? 16 : 24,
+  borderRadius: Platform.OS === 'web' ? 8 : 10,
+  width: Platform.OS === 'web' ? '60%' : '90%',
+  maxWidth: Platform.OS === 'web' ? 400 : undefined,
+},
 });
+
 
  
