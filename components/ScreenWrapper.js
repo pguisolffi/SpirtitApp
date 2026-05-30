@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView, useWindowDimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView, useWindowDimensions, Image, ActivityIndicator } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { auth, db } from '../screens/firebaseConfig';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { APP_NOME } from '../constants/AppBranding';
+import { podeGerenciarModulo } from '../constants/Perfis';
 
 export default function ScreenWrapper({
   children,
@@ -19,24 +20,42 @@ export default function ScreenWrapper({
   const currentPath = usePathname();
   const { width: winWidth } = useWindowDimensions();
   const [userName, setUserName] = useState('Usuário');
+  const [userProfile, setUserProfile] = useState('');
+  const [userPermissions, setUserPermissions] = useState([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user?.email) {
         try {
-          const q = query(collection(db, 'bzmpessoa'), where('email', '==', user.email));
-          const snapshot = await getDocs(q);
-          if (!snapshot.empty) {
-            const dados = snapshot.docs[0].data();
+          // 1. Obter nome do usuário do bzmpessoa
+          const qPessoa = query(collection(db, 'bzmpessoa'), where('email', '==', user.email));
+          const snapshotPessoa = await getDocs(qPessoa);
+          if (!snapshotPessoa.empty) {
+            const dados = snapshotPessoa.docs[0].data();
             const nomeCompleto = dados.nome || 'Usuário';
             const primeiro = nomeCompleto.split(' ')[0];
             setUserName(primeiro);
           }
+
+          // 2. Obter perfil e permissões do bzmusuario
+          const qUsuario = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
+          const snapshotUsuario = await getDocs(qUsuario);
+          if (!snapshotUsuario.empty) {
+            const dadosUsuario = snapshotUsuario.docs[0].data();
+            setUserProfile(dadosUsuario.perfil || '');
+            setUserPermissions(dadosUsuario.permissoes || []);
+          }
         } catch (err) {
-          console.error('Erro ao buscar nome no Firestore:', err);
+          console.error('Erro ao buscar dados do usuário no ScreenWrapper:', err);
+        } finally {
+          setPermissionsLoaded(true);
         }
       } else {
         setUserName('Usuário');
+        setUserProfile('');
+        setUserPermissions([]);
+        setPermissionsLoaded(true);
       }
     });
     return () => unsubscribe();
@@ -69,22 +88,54 @@ export default function ScreenWrapper({
 
   const isWebDesktop = Platform.OS === 'web' && winWidth > 768;
 
-  const sidebarLinks = [
-    { label: 'Painel', icon: 'grid-outline', route: '/Rota_HomeFuncionario' },
-    { label: 'Novo Atendimento', icon: 'person-add-outline', route: '/Rota_NovoAtendimento' },
-    { label: 'Fila de Espera', icon: 'people-outline', route: '/Rota_FilaDeEsperaScreen' },
-    { label: 'Próximos Eventos', icon: 'calendar-outline', route: '/Rota_AgendaScreen' },
-    { label: 'Escala de Voluntários', icon: 'list-circle-outline', route: '/Rota_EscalaVoluntarios' },
-    { label: 'Biblioteca', icon: 'library-outline', route: '/Rota_Livros' },
-    { label: 'Orações', icon: 'heart-outline', route: '/Rota_OracoesScreen' },
-    { label: 'Cursos e Palestras', icon: 'book-outline', route: '/Rota_CursosPalestrasScreen' },
-  ];
+  const pathPermissionMap = {
+    '/Rota_NovoAtendimento': 'atendimento',
+    '/Rota_FilaDeEsperaScreen': 'fila',
+    '/Rota_AgendaScreen': 'eventos',
+    '/Rota_EscalaVoluntarios': 'voluntarios',
+    '/Rota_Livros': 'biblioteca',
+    '/Rota_LeitorPDFScreen': 'biblioteca',
+    '/Rota_OracoesScreen': 'oracoes',
+    '/Rota_OracaoViewerScreen': 'oracoes',
+    '/Rota_CursosPalestrasScreen': 'cursos',
+    '/Rota_VideoViewerScreen': 'cursos',
+    '/Rota_GerenciarUsuariosScreen': 'usuarios',
+    '/Rota_GerenciarPessoaScreen': 'pessoas',
+  };
 
-  const adminLinks = [
-    { label: 'Minha Conta', icon: 'person-outline', route: '/Rota_ContaScreen' },
-    { label: 'Gerenciar Usuários', icon: 'settings-outline', route: '/Rota_GerenciarUsuariosScreen' },
-    { label: 'Gerenciar Pessoas', icon: 'people-circle-outline', route: '/Rota_GerenciarPessoaScreen' },
-  ];
+  const requiredPermission = pathPermissionMap[currentPath];
+  const isAuthorized = !requiredPermission || podeGerenciarModulo(userProfile, userPermissions, requiredPermission);
+
+  const filteredSidebarLinks = sidebarLinks.filter(link => {
+    const reqPerm = pathPermissionMap[link.route];
+    return !reqPerm || podeGerenciarModulo(userProfile, userPermissions, reqPerm);
+  });
+
+  const filteredAdminLinks = adminLinks.filter(link => {
+    const reqPerm = pathPermissionMap[link.route];
+    return !reqPerm || podeGerenciarModulo(userProfile, userPermissions, reqPerm);
+  });
+
+  if (!permissionsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+        <ActivityIndicator size="large" color="#6A5ACD" />
+      </View>
+    );
+  }
+
+  const renderAccessDenied = () => (
+    <View style={styles.deniedContainer}>
+      <Ionicons name="lock-closed-outline" size={64} color="#dc2626" />
+      <Text style={styles.deniedTitle}>Acesso Negado</Text>
+      <Text style={styles.deniedMessage}>
+        Você não possui permissão para acessar esta funcionalidade.
+      </Text>
+      <TouchableOpacity style={styles.deniedButton} onPress={() => router.replace('/Rota_HomeFuncionario')}>
+        <Text style={styles.deniedButtonText}>Voltar ao Painel</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   if (isWebDesktop) {
     if (!showHeader) {
@@ -114,7 +165,7 @@ export default function ScreenWrapper({
           {/* Sidebar Links */}
           <ScrollView style={styles.sidebarScroll} showsVerticalScrollIndicator={false}>
             <Text style={styles.sidebarSectionTitle}>MENU PRINCIPAL</Text>
-            {sidebarLinks.map((link) => {
+            {filteredSidebarLinks.map((link) => {
               const active = isActive(link.route);
               return (
                 <TouchableOpacity
@@ -137,7 +188,7 @@ export default function ScreenWrapper({
             <View style={styles.sidebarDivider} />
 
             <Text style={styles.sidebarSectionTitle}>ADMINISTRAÇÃO</Text>
-            {adminLinks.map((link) => {
+            {filteredAdminLinks.map((link) => {
               const active = isActive(link.route);
               return (
                 <TouchableOpacity
@@ -191,7 +242,7 @@ export default function ScreenWrapper({
             contentContainerStyle={scrollable ? styles.webContentContainer : undefined}
           >
             <View style={scrollable ? styles.webCard : styles.webCardFlex}>
-              {children}
+              {!isAuthorized ? renderAccessDenied() : children}
             </View>
           </ContainerComponent>
         </View>
@@ -215,13 +266,41 @@ export default function ScreenWrapper({
         </View>
       )}
       <ContainerComponent style={{ flex: 1 }}>
-        {children}
+        {!isAuthorized ? renderAccessDenied() : children}
       </ContainerComponent>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  deniedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  deniedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#dc2626',
+    marginTop: 16,
+  },
+  deniedMessage: {
+    textAlign: 'center',
+    color: '#64748b',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  deniedButton: {
+    backgroundColor: '#6A5ACD',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  deniedButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   webMainLayout: {
     flex: 1,
     flexDirection: 'row',
@@ -427,5 +506,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     width: '100%',
     height: '100%',
+  },
+  deniedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+    marginVertical: 40,
+    alignSelf: 'center',
+  },
+  deniedTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  deniedMessage: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 24,
+    maxWidth: 320,
+    lineHeight: 22,
+  },
+  deniedButton: {
+    backgroundColor: '#6A5ACD',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    shadowColor: '#6A5ACD',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  deniedButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });

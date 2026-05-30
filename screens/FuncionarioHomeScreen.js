@@ -18,6 +18,7 @@ import dev from '../gambiarrasTemporarias/dev';
 import { useRouter } from 'expo-router';
 import { width, height } from '../constants/Layout';
 import { APP_NOME, APP_TITULO_PAINEL } from '../constants/AppBranding';
+import { podeGerenciarModulo } from '../constants/Perfis';
 
 const menuItems = [
   { label: 'Novo Atendimento', icon: 'person-add-outline', route: '/Rota_NovoAtendimento' },
@@ -37,6 +38,21 @@ const drawerItems = [
   { label: 'Sair', icon: 'log-out-outline', action: 'sair' },
 ];
 
+const menuPermissions = {
+  'Novo Atendimento': 'atendimento',
+  'Fila de Espera': 'fila',
+  'Próximos Eventos': 'eventos',
+  'Escala de Voluntários': 'voluntarios',
+  'Biblioteca': 'biblioteca',
+  'Orações': 'oracoes',
+  'Cursos e Palestras': 'cursos',
+};
+
+const drawerPermissions = {
+  'Usuários': 'usuarios',
+  'Pessoas': 'pessoas',
+};
+
 
 import ScreenWrapper from '../components/ScreenWrapper';
 
@@ -47,29 +63,39 @@ export default function HomeFuncionario() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnimation = useState(new Animated.Value(-width * 0.6))[0];
   const router = useRouter();
+  const [userProfile, setUserProfile] = useState('');
+  const [userPermissions, setUserPermissions] = useState([]);
 
   useEffect(() => {
-    const buscarNomeDoUsuario = async () => {
-      const email = auth.currentUser?.email;
-
-      if (!email) return;
+    const buscarDadosUsuario = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
 
       try {
-        const q = query(collection(db, 'bzmpessoa'), where('email', '==', email));
-        const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-          const dados = snapshot.docs[0].data();
+        // 1. Obter nome do usuário do bzmpessoa
+        const qPessoa = query(collection(db, 'bzmpessoa'), where('email', '==', user.email));
+        const snapshotPessoa = await getDocs(qPessoa);
+        if (!snapshotPessoa.empty) {
+          const dados = snapshotPessoa.docs[0].data();
           const nomeCompleto = dados.nome || 'Amigo';
           const primeiro = nomeCompleto.split(' ')[0];
           setPrimeiroNome(primeiro);
         }
+
+        // 2. Obter perfil e permissões do bzmusuario
+        const qUsuario = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
+        const snapshotUsuario = await getDocs(qUsuario);
+        if (!snapshotUsuario.empty) {
+          const dadosUsuario = snapshotUsuario.docs[0].data();
+          setUserProfile(dadosUsuario.perfil || '');
+          setUserPermissions(dadosUsuario.permissoes || []);
+        }
       } catch (err) {
-        console.error('Erro ao buscar nome no Firestore:', err);
+        console.error('Erro ao buscar dados do usuário no HomeFuncionario:', err);
       }
     };
 
-    buscarNomeDoUsuario();
+    buscarDadosUsuario();
   }, []);
 
   const handlePress = async (item) => {
@@ -109,6 +135,19 @@ export default function HomeFuncionario() {
       setDrawerOpen(false);
     });
   };
+
+  const visibleMenuItems = menuItems.filter((item) => {
+    if (item.label === 'DEV') {
+      return userProfile === 'ADMINISTRADOR';
+    }
+    const reqPerm = menuPermissions[item.label];
+    return !reqPerm || podeGerenciarModulo(userProfile, userPermissions, reqPerm);
+  });
+
+  const visibleDrawerItems = drawerItems.filter((item) => {
+    const reqPerm = drawerPermissions[item.label];
+    return !reqPerm || podeGerenciarModulo(userProfile, userPermissions, reqPerm);
+  });
 
   const handleDrawerItemPress = async (action) => {
     console.log('Clicou em', action);
@@ -156,7 +195,7 @@ export default function HomeFuncionario() {
             </View>
 
             {/* 🔥 MENUS ABAIXO */}
-            {drawerItems.map((item, index) => (
+            {visibleDrawerItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.drawerItemContainer}
@@ -174,13 +213,13 @@ export default function HomeFuncionario() {
           </Animated.View>
         </TouchableOpacity>
       )}
-  
+   
       {/* Conteúdo da Home */}
       <Text style={styles.title}>👋 Olá, {primeiroNome}!</Text>
       <Text style={styles.subtitle}>Tenha um excelente dia de trabalho 🙏</Text>
       <FlatList
         key={isWebDesktop ? 'web-grid' : 'mobile-grid'}
-        data={menuItems}
+        data={visibleMenuItems}
         keyExtractor={(item) => item.label}
         numColumns={isWebDesktop ? 4 : 2}
         renderItem={renderItem}
