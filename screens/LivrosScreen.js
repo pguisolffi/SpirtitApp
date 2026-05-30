@@ -137,9 +137,10 @@ export default function LivrosScreen() {
     }
 
     try {
-      const nomeArquivo = `${livro.titulo.replace(/\s+/g, '_')}.pdf`;
+      const nomeArquivo = `${livro.titulo.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}.pdf`;
       const fileUri = FileSystem.documentDirectory + nomeArquivo;
 
+      // 1. Baixar o arquivo na área de cache do aplicativo
       const download = FileSystem.createDownloadResumable(
         livro.linkPDF,
         fileUri,
@@ -153,16 +154,45 @@ export default function LivrosScreen() {
 
       if (!uri) throw new Error('Falha ao baixar o PDF.');
 
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(uri, {
-          dialogTitle: 'Escolha onde salvar seu PDF',
+      // 2. Usar StorageAccessFramework para solicitar ao usuário uma pasta no Android (ex: Downloads)
+      if (Platform.OS === 'android') {
+        const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          Alert.alert('Permissão necessária', 'Para salvar o arquivo, você precisa escolher uma pasta.');
+          return;
+        }
+
+        // Criar o arquivo na pasta escolhida pelo usuário
+        const newFileUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          nomeArquivo,
+          'application/pdf'
+        );
+
+        // Ler o arquivo temporário como Base64 e salvar no novo caminho público
+        const base64Data = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
         });
+
+        await FileSystem.writeAsStringAsync(newFileUri, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        Alert.alert('Sucesso', 'Livro salvo com sucesso na pasta selecionada!');
       } else {
-        await Linking.openURL(livro.linkPDF);
+        // Fallback para iOS (que lida perfeitamente com a folha de compartilhamento/salvamento)
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(uri, {
+            dialogTitle: 'Escolha onde salvar seu PDF',
+          });
+        } else {
+          await Linking.openURL(livro.linkPDF);
+        }
       }
     } catch (err) {
       console.error('❌ Erro ao salvar:', err);
+      // Fallback final: abrir no navegador
       try {
         await Linking.openURL(livro.linkPDF);
       } catch (linkErr) {
