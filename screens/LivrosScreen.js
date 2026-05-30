@@ -16,7 +16,7 @@ import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc, dele
 import { auth, db } from './firebaseConfig';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
