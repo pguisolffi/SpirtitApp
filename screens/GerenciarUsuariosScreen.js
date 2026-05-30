@@ -12,8 +12,8 @@ import {
   ActivityIndicator,
   LayoutAnimation,
 } from 'react-native';
-import { collection, query, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { db, auth } from './firebaseConfig';
 import { width, height } from '../constants/Layout';
 import { rotuloPerfil } from '../constants/Perfis';
 import PerfilPermissoesEditor from '../components/PerfilPermissoesEditor';
@@ -26,6 +26,7 @@ export default function GerenciarUsuariosScreen() {
   const [usuarioSelecionado, setUsuarioSelecionado] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState('');
+  const [currentUserPerfil, setCurrentUserPerfil] = useState('');
 
   useEffect(() => {
     const carregarUsuarios = async () => {
@@ -46,10 +47,31 @@ export default function GerenciarUsuariosScreen() {
       }
     };
 
+    const obterPerfilAtual = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const q = query(collection(db, 'bzmusuario'), where('uid', '==', user.uid));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const dados = querySnapshot.docs[0].data();
+            setCurrentUserPerfil(dados.perfil);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao obter perfil do usuário logado:', error);
+      }
+    };
+
     carregarUsuarios();
+    obterPerfilAtual();
   }, []);
 
   const handleSalvar = async (usuario) => {
+    if (currentUserPerfil !== 'ADMINISTRADOR') {
+      Alert.alert('Erro', 'Apenas administradores podem salvar alterações.');
+      return;
+    }
     try {
       setSalvando(true);
       const { id, ...dados } = usuario;
@@ -107,6 +129,7 @@ export default function GerenciarUsuariosScreen() {
                 onChangeText={(text) => atualizarCampo(item.id, 'email', text)}
                 placeholder="Email"
                 keyboardType="email-address"
+                editable={currentUserPerfil === 'ADMINISTRADOR'}
               />
               <TextInput
                 style={styles.input}
@@ -114,12 +137,14 @@ export default function GerenciarUsuariosScreen() {
                 onChangeText={(text) => atualizarCampo(item.id, 'telefone', text)}
                 placeholder="Telefone"
                 keyboardType="phone-pad"
+                editable={currentUserPerfil === 'ADMINISTRADOR'}
               />
               <TextInput
                 style={styles.input}
                 value={item.endereco || ''}
                 onChangeText={(text) => atualizarCampo(item.id, 'endereco', text)}
                 placeholder="Endereço"
+                editable={currentUserPerfil === 'ADMINISTRADOR'}
               />
               <TextInput
                 style={styles.input}
@@ -127,20 +152,27 @@ export default function GerenciarUsuariosScreen() {
                 onChangeText={(text) => atualizarCampo(item.id, 'dtnascimento', text)}
                 placeholder="Data de Nascimento (DD/MM/AAAA)"
                 keyboardType="numeric"
+                editable={currentUserPerfil === 'ADMINISTRADOR'}
               />
 
               <PerfilPermissoesEditor
                 perfil={item.perfil}
                 permissoes={item.permissoes}
-                editable
+                editable={currentUserPerfil === 'ADMINISTRADOR'}
                 onChange={(dados) => atualizarPerfilPermissoes(item.id, dados)}
               />
 
-              <TouchableOpacity style={styles.saveButton} onPress={() => handleSalvar(item)}>
-                <Text style={styles.saveButtonText}>
-                  {salvando ? 'Salvando...' : 'Salvar Alterações'}
+              {currentUserPerfil === 'ADMINISTRADOR' ? (
+                <TouchableOpacity style={styles.saveButton} onPress={() => handleSalvar(item)}>
+                  <Text style={styles.saveButtonText}>
+                    {salvando ? 'Salvando...' : 'Salvar Alterações'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={{ color: '#888', fontStyle: 'italic', textAlign: 'center', marginTop: 10 }}>
+                  Apenas administradores podem alterar perfis ou informações.
                 </Text>
-              </TouchableOpacity>
+              )}
             </>
           )}
         </TouchableOpacity>

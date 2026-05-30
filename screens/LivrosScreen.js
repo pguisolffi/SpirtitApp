@@ -18,6 +18,7 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { width, height } from '../constants/Layout';
 
@@ -92,13 +93,23 @@ export default function LivrosScreen() {
 
 
   const compartilharPDF = async (livro) => {
+    if (Platform.OS === 'web') {
+      window.open(livro.linkPDF, '_blank');
+      return;
+    }
+
     try {
       const nomeArquivo = livro.titulo.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.pdf';
       const fileUri = FileSystem.documentDirectory + nomeArquivo;
 
       const downloadResumable = FileSystem.createDownloadResumable(
         livro.linkPDF,
-        fileUri
+        fileUri,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+          }
+        }
       );
 
       const { uri } = await downloadResumable.downloadAsync();
@@ -111,16 +122,33 @@ export default function LivrosScreen() {
       }
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      Alert.alert('Erro', 'Não foi possível baixar o PDF.');
+      try {
+        await Linking.openURL(livro.linkPDF);
+      } catch (linkErr) {
+        Alert.alert('Erro', 'Não foi possível compartilhar o PDF nem abrir o link.');
+      }
     }
   };
 
   const baixarPDF = async (livro) => {
+    if (Platform.OS === 'web') {
+      window.open(livro.linkPDF, '_blank');
+      return;
+    }
+
     try {
       const nomeArquivo = `${livro.titulo.replace(/\s+/g, '_')}.pdf`;
       const fileUri = FileSystem.documentDirectory + nomeArquivo;
 
-      const download = FileSystem.createDownloadResumable(livro.linkPDF, fileUri);
+      const download = FileSystem.createDownloadResumable(
+        livro.linkPDF,
+        fileUri,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+          }
+        }
+      );
       const { uri } = await download.downloadAsync();
 
       if (!uri) throw new Error('Falha ao baixar o PDF.');
@@ -131,11 +159,15 @@ export default function LivrosScreen() {
           dialogTitle: 'Escolha onde salvar seu PDF',
         });
       } else {
-        Alert.alert('Erro', 'O compartilhamento não está disponível neste dispositivo.');
+        await Linking.openURL(livro.linkPDF);
       }
     } catch (err) {
       console.error('❌ Erro ao salvar:', err);
-      Alert.alert('Erro', 'Não foi possível salvar o PDF.');
+      try {
+        await Linking.openURL(livro.linkPDF);
+      } catch (linkErr) {
+        Alert.alert('Erro', 'Não foi possível baixar o PDF pelo app nem abrir o link.');
+      }
     }
   };
 

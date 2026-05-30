@@ -313,6 +313,11 @@ export default function CursosPalestrasScreen() {
                     source={{ uri: `https://www.youtube.com/embed/${selectedVideoId}` }}
                     style={styles.videoWebview}
                     allowsFullscreenVideo
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    allowsInlineMediaPlayback={true}
+                    mediaPlaybackRequiresUserAction={false}
+                    originWhitelist={['*']}
                   />
                 )}
               </View>

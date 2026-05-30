@@ -45,50 +45,56 @@ const CustomSalaSelector = ({ selectedIndex, onChange, patients = [] }) => {
 
   return (
     <View style={styles.selectorWrapper}>
-      <View style={styles.salaSelectorContainer}>
-        {labels.map((label, index) => {
-          const count = getCounts(index);
-          return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.salaButton,
-                selectedIndex === index && styles.salaButtonSelected,
-              ]}
-              onPress={() => handlePress(index)}
-            >
-              <Icon
-                name={icons[index]}
-                size={16}
-                color={selectedIndex === index ? '#fff' : '#555'}
-                style={{ marginRight: 6 }}
-              />
-              <Text
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollSelectorContent}
+      >
+        <View style={styles.salaSelectorContainer}>
+          {labels.map((label, index) => {
+            const count = getCounts(index);
+            return (
+              <TouchableOpacity
+                key={index}
                 style={[
-                  styles.salaButtonText,
-                  selectedIndex === index && styles.salaButtonTextSelected,
+                  styles.salaButton,
+                  selectedIndex === index && styles.salaButtonSelected,
                 ]}
-                numberOfLines={1}
+                onPress={() => handlePress(index)}
               >
-                {label}
-              </Text>
-              {count > 0 && (
-                <View style={[
-                  styles.tabBadge,
-                  selectedIndex === index && styles.tabBadgeActive,
-                ]}>
-                  <Text style={[
-                    styles.tabBadgeText,
-                    selectedIndex === index && styles.tabBadgeTextActive,
+                <Icon
+                  name={icons[index]}
+                  size={16}
+                  color={selectedIndex === index ? '#fff' : '#555'}
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={[
+                    styles.salaButtonText,
+                    selectedIndex === index && styles.salaButtonTextSelected,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {label}
+                </Text>
+                {count > 0 && (
+                  <View style={[
+                    styles.tabBadge,
+                    selectedIndex === index && styles.tabBadgeActive,
                   ]}>
-                    {count}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+                    <Text style={[
+                      styles.tabBadgeText,
+                      selectedIndex === index && styles.tabBadgeTextActive,
+                    ]}>
+                      {count}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -581,7 +587,7 @@ const styles = StyleSheet.create({
   },
   salaSelectorContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 100,
     padding: 4,
@@ -590,6 +596,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
     elevation: 3,
+    minWidth: '100%',
+    justifyContent: 'space-around',
+  },
+  scrollSelectorContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   salaButton: {
     flexDirection: 'row',
