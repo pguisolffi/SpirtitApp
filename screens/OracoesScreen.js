@@ -7,17 +7,19 @@ import {
   TextInput,
   Modal,
   StyleSheet,
-  Dimensions,
   ActivityIndicator,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
-import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc,getDoc,where, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, updateDoc, doc, where, query } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
+import ScreenWrapper from '../components/ScreenWrapper';
+import { podeGerenciarModulo } from '../constants/Perfis';
 
 export default function OracoesScreen() {
   const [oracoes, setOracoes] = useState([]);
@@ -28,7 +30,14 @@ export default function OracoesScreen() {
   const [novoTexto, setNovoTexto] = useState('');
   const [editandoId, setEditandoId] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState('');
+  const [permissoesUsuario, setPermissoesUsuario] = useState([]);
   const router = useRouter();
+
+  const podeAdministrar = podeGerenciarModulo(
+    perfilUsuario,
+    permissoesUsuario,
+    'oracoes'
+  );
 
   useEffect(() => {
     carregarOracoes();
@@ -38,9 +47,14 @@ export default function OracoesScreen() {
   const carregarOracoes = async () => {
     try {
       setLoading(true);
-      const q = query(collection(db, 'bzmoracoes'), orderBy('criadoEm', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const querySnapshot = await getDocs(collection(db, 'bzmoracoes'));
+      const lista = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => {
+          const tA = a.criadoEm?.seconds || a.criadoEm?.toDate?.()?.getTime?.() / 1000 || 0;
+          const tB = b.criadoEm?.seconds || b.criadoEm?.toDate?.()?.getTime?.() / 1000 || 0;
+          return tB - tA;
+        });
       setOracoes(lista);
     } catch (error) {
       console.error('Erro ao carregar orações:', error);
@@ -49,7 +63,7 @@ export default function OracoesScreen() {
     }
   };
 
- const buscarPerfilUsuario = async () => {
+  const buscarPerfilUsuario = async () => {
     try {
       const user = auth.currentUser;
       if (user) {
@@ -59,6 +73,7 @@ export default function OracoesScreen() {
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
           setPerfilUsuario(dados.perfil);
+          setPermissoesUsuario(dados.permissoes);
         } else {
           console.log('Usuário não encontrado no Firestore');
         }
@@ -105,7 +120,7 @@ export default function OracoesScreen() {
   };
 
   const abrirMenuOpcoes = (item) => {
-    if (perfilUsuario !== 'admin') return;
+    if (!podeAdministrar) return;
 
     Alert.alert(
       'Opções',
@@ -150,9 +165,7 @@ export default function OracoesScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🙏 Orações</Text>
-
+    <ScreenWrapper title="Orações" scrollable={false}>
       <TextInput
         style={styles.inputFiltro}
         placeholder="Buscar orações..."
@@ -175,13 +188,12 @@ export default function OracoesScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {perfilUsuario === 'admin' && (
+      {podeAdministrar && (
         <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
           <Ionicons name="add" size={32} color="#fff" />
         </TouchableOpacity>
       )}
 
-      {/* Modal de adicionar/editar */}
       <Modal
         animationType="slide"
         transparent
@@ -190,6 +202,18 @@ export default function OracoesScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.botaoFecharModal}
+              onPress={() => {
+                setModalVisible(false);
+                setEditandoId(null);
+                setNovoTitulo('');
+                setNovoTexto('');
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>
               {editandoId ? 'Editar Oração' : 'Adicionar Nova Oração'}
             </Text>
@@ -214,23 +238,12 @@ export default function OracoesScreen() {
                   {editandoId ? 'Atualizar' : 'Salvar'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#ccc' }]}
-                onPress={() => {
-                  setModalVisible(false);
-                  setEditandoId(null);
-                  setNovoTitulo('');
-                  setNovoTexto('');
-                }}
-              >
-                <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
-              </TouchableOpacity>
             </View>
 
           </View>
         </View>
       </Modal>
-    </View>
+    </ScreenWrapper>
   );
 }
 
@@ -243,10 +256,25 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#6A5ACD', borderRadius: 30, padding: 15, elevation: 5 },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '85%' },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    width: '85%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: 450,
+    }),
+  },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   modalInput: { backgroundColor: '#f1f1f1', borderRadius: 8, padding: 10, marginBottom: 10 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   modalButton: { flex: 1, backgroundColor: '#6A5ACD', borderRadius: 8, padding: 10, marginHorizontal: 5, alignItems: 'center' },
   modalButtonText: { color: '#fff', fontWeight: 'bold' },
+  botaoFecharModal: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+    padding: 4,
+  },
 });

@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-
-const { width } = Dimensions.get('window');
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { width } from '../constants/Layout';
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
+    <ScreenWrapper title="Bem-vindo" showBackButton={false}>
       <Text style={styles.title}>Bem-vindo!</Text>
 
       <TouchableOpacity style={styles.card}>
@@ -19,7 +19,7 @@ export default function HomeScreen() {
       <TouchableOpacity style={styles.card}>
         <Text style={styles.cardText}>🗒️ Minhas Orientações</Text>
       </TouchableOpacity>
-    </View>
+    </ScreenWrapper>
   );
 }
 

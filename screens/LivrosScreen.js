@@ -7,23 +7,22 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { getAuth } from 'firebase/auth';
-import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { collection, getDocs, getDoc, doc, query, where, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { auth, db } from './firebaseConfig';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
+import { width, height } from '../constants/Layout';
 
-
-const { width, height } = Dimensions.get('window');
+import ScreenWrapper from '../components/ScreenWrapper';
+import { podeGerenciarModulo } from '../constants/Perfis';
 
 export default function LivrosScreen() {
   const [busca, setBusca] = useState('');
@@ -31,8 +30,8 @@ export default function LivrosScreen() {
   const [carregando, setCarregando] = useState(true);
   const [livroExpandido, setLivroExpandido] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState('');
+  const [permissoesUsuario, setPermissoesUsuario] = useState([]);
   const [tabSelecionada, setTabSelecionada] = useState(0);
-  const auth = getAuth();
   const user = auth.currentUser;
 
   // Estados para novo livro
@@ -48,6 +47,11 @@ export default function LivrosScreen() {
 
   const router = useRouter();
 
+  const podeAdministrar = podeGerenciarModulo(
+    perfilUsuario,
+    permissoesUsuario,
+    'biblioteca'
+  );
 
   const verificarPermissao = async () => {
     try {
@@ -59,6 +63,7 @@ export default function LivrosScreen() {
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
           setPerfilUsuario(dados.perfil);
+          setPermissoesUsuario(dados.permissoes);
         } else {
           console.log('Usuário não encontrado no Firestore');
         }
@@ -176,7 +181,7 @@ export default function LivrosScreen() {
             await deleteDoc(doc(db, 'bzmLivro', livro.id));
             setLivros((prev) => prev.filter((l) => l.id !== livro.id));
           } catch (err) {
-            Alert.alert('Erro', 'Não foi possível remover o livro.');
+            Alert.alert('Erro', 'Não foi possível remover the book.');
           }
         },
       },
@@ -233,7 +238,7 @@ export default function LivrosScreen() {
                 </Text>
               </TouchableOpacity>
             )}
-            {(perfilUsuario === 'admin') && (
+            {podeAdministrar && (
               <TouchableOpacity
                 onPress={() => removerLivro(item)}
                 style={styles.botaoRemover}
@@ -308,11 +313,7 @@ export default function LivrosScreen() {
 
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerWrapper}>
-        <Text style={styles.headerTitle}>📚 Biblioteca</Text>
-      </View>
-
+    <ScreenWrapper title="Biblioteca" scrollable={false}>
       <SegmentedControl
         values={["PDF", "Empréstimo", "Venda"]}
         selectedIndex={tabSelecionada}
@@ -332,7 +333,7 @@ export default function LivrosScreen() {
         renderItem={renderItem}
         ListEmptyComponent={<Text style={styles.emptyText}>Nenhum livro encontrado.</Text>}
       />
-      {(perfilUsuario === 'admin' || perfilUsuario === 'administrador') && (
+      {podeAdministrar && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => setModalVisible(true)}
@@ -349,6 +350,13 @@ export default function LivrosScreen() {
       >
         <View style={styles.modalContainer}>
           <ScrollView contentContainerStyle={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.botaoFecharModal}
+              onPress={() => setModalVisible(false)}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>Adicionar Novo Livro</Text>
 
             <TextInput
@@ -413,19 +421,11 @@ export default function LivrosScreen() {
               <TouchableOpacity style={styles.modalButton} onPress={adicionarLivro}>
                 <Text style={styles.modalButtonText}>Salvar</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#ccc' }]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
-              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
       </Modal>
-
-
-    </View>
+    </ScreenWrapper>
   );
 }
 
@@ -550,6 +550,9 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     width: '85%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: 450,
+    }),
   },
   modalTitle: {
     fontSize: 20,
@@ -586,5 +589,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-
+  botaoFecharModal: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+    padding: 4,
+  },
 });

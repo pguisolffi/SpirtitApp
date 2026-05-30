@@ -1,31 +1,25 @@
 // NovoAtendimento.js (versão melhorada)
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   ScrollView,
   FlatList,
   LayoutAnimation,
   Alert,
-  Platform,
-  UIManager,
+  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { db } from './firebaseConfig';
 import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
-
-if (Platform.OS === 'android') {
-  UIManager.setLayoutAnimationEnabledExperimental &&
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function NovoAtendimento() {
   const router = useRouter();
@@ -36,7 +30,34 @@ export default function NovoAtendimento() {
   const [buscaPaciente, setBuscaPaciente] = useState('');
   const [sugestoes, setSugestoes] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
+  const [erros, setErros] = useState({ buscaPaciente: false, novaQueixa: false, sala: false });
   const salas = ['Maca', 'Passe', 'Fraterno'];
+
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  const showToast = (message) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.delay(2500),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => {
+      setToastVisible(false);
+    });
+  };
+
+  const triggerShake = () => {
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
 
   const buscarPacientes = async (texto) => {
     setBuscaPaciente(texto);
@@ -68,6 +89,7 @@ export default function NovoAtendimento() {
     setBuscaPaciente(paciente.nome);
     setSelecionado(paciente);
     setSugestoes([]);
+    setErros((prev) => ({ ...prev, buscaPaciente: false }));
     buscarHistoricoDoPaciente(paciente.idPessoa);
   };
 
@@ -77,9 +99,17 @@ export default function NovoAtendimento() {
       const historicoQuery = query(colRef, where('id_paciente', '==', idPessoa));
       const snapshot = await getDocs(historicoQuery);
   
-      const historicoFormatado = snapshot.docs.map((doc, index) => {
+      const docsOrdenados = [...snapshot.docs].sort((a, b) => {
+        const tA = a.data().data_hora?.seconds || 0;
+        const tB = b.data().data_hora?.seconds || 0;
+        return tB - tA;
+      });
+
+      const historicoFormatado = docsOrdenados.map((doc, index) => {
         const dados = doc.data();
-        const dataFormatada = new Date(dados.data_hora?.seconds * 1000).toLocaleDateString('pt-BR');
+        const dataFormatada = dados.data_hora
+          ? new Date(dados.data_hora.seconds * 1000).toLocaleDateString('pt-BR')
+          : 'Data não registrada';
         return {
           id: index + 1,
           queixa: dados.queixa,
@@ -97,8 +127,15 @@ export default function NovoAtendimento() {
   
 
   const handleSalvarAtendimento = async () => {
-    if (!buscaPaciente.trim() || !novaQueixa.trim() || !sala || !selecionado) {
-      Alert.alert('Atenção', 'Preencha todos os campos obrigatórios.');
+    const novosErros = {
+      buscaPaciente: !buscaPaciente.trim() || !selecionado,
+      novaQueixa: !novaQueixa.trim(),
+      sala: !sala,
+    };
+    setErros(novosErros);
+
+    if (novosErros.buscaPaciente || novosErros.novaQueixa || novosErros.sala) {
+      triggerShake();
       return;
     }
   
@@ -122,132 +159,138 @@ export default function NovoAtendimento() {
         queixa: novaQueixa,
         sala_atendida: sala,
         status: 'aguardando',
+        prioridade: '#4CAF50',
       };
   
       await addDoc(collection(db, 'bzmAtendimentoHist'), novoAtendimento);
   
-      Alert.alert('Sucesso', 'Atendimento salvo com sucesso!');
+      showToast('Atendimento salvo com sucesso!');
       setNovaQueixa('');
       setSala('');
       setSelecionado(null);
       setBuscaPaciente('');
       setHistorico([]);
+      setErros({ buscaPaciente: false, novaQueixa: false, sala: false });
     } catch (error) {
       console.error('Erro ao salvar atendimento:', error);
       Alert.alert('Erro', 'Não foi possível salvar o atendimento.');
     }
   };
   
-  
   return (
-    <FlatList
-      data={[{}]} // valor fictício só para manter o FlatList vivo
-      keyExtractor={(_, index) => index.toString()}
-      keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={
-        <View style={styles.container}>
-          <View style={styles.topo}>
-            <MaterialIcons name="healing" size={26} color="#5A90E0" />
-            <Text style={styles.title}>Atendimento Espiritual</Text>
+    <ScreenWrapper title="Atendimento Espiritual" scrollable={true}>
+      <Animated.View style={{ transform: [{ translateX: shakeAnimation }] }}>
+        <TextInput
+          style={[styles.input, erros.buscaPaciente && styles.inputErro]}
+          placeholder="Pesquise pelo nome ou nascimento *"
+          value={buscaPaciente}
+          onChangeText={(text) => {
+            buscarPacientes(text);
+            if (text) setErros((prev) => ({ ...prev, buscaPaciente: false }));
+          }}
+        />
+
+        {/* 🔁 Renderiza sugestões manualmente */}
+        {sugestoes.length > 0 && (
+          <View style={styles.listaSugestoes}>
+            {sugestoes.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                onPress={() => selecionarPaciente(item)}
+                style={styles.sugestaoItem}
+              >
+                <Text>{item.nome}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-  
-          <TextInput
-            style={styles.input}
-            placeholder="Pesquise pelo nome ou nascimento"
-            value={buscaPaciente}
-            onChangeText={buscarPacientes}
-          />
-  
-          {/* 🔁 Renderiza sugestões manualmente */}
-          {sugestoes.length > 0 && (
-            <View style={styles.listaSugestoes}>
-              {sugestoes.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => selecionarPaciente(item)}
-                  style={styles.sugestaoItem}
-                >
-                  <Text>{item.nome}</Text>
-                </TouchableOpacity>
-              ))}
+        )}
+
+        {buscaPaciente.length > 2 && sugestoes.length === 0 && !selecionado && (
+          <TouchableOpacity
+            style={styles.botaoCadastroSugestao}
+            onPress={() => router.push({
+              pathname: '/Rota_CadastroPessoaScreen',
+              params: { nome: buscaPaciente }
+            })}
+          >
+            <MaterialIcons name="person-add" size={20} color="#fff" />
+            <Text style={styles.textoCadastro}>Cadastrar nova pessoa</Text>
+          </TouchableOpacity>
+        )}
+
+        <TextInput
+          style={[styles.input, styles.novaQueixa, erros.novaQueixa && styles.inputErro]}
+          placeholder="Insira o motivo da sua visita hoje... *"
+          multiline
+          value={novaQueixa}
+          onChangeText={(text) => {
+            setNovaQueixa(text);
+            if (text) setErros((prev) => ({ ...prev, novaQueixa: false }));
+          }}
+        />
+
+        <View style={styles.historicoContainer}>
+          <Text style={styles.subTitle}>Histórico</Text>
+          {(mostrarHistoricoCompleto ? historico : historico.slice(0, 2)).map((item) => (
+            <View key={item.id} style={styles.historicoItem}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialIcons name="history" size={18} color="#999" style={{ marginRight: 8 }} />
+                <Text style={styles.historicoText}>{item.queixa}</Text>
+              </View>
+              <Text style={styles.historicoData}>{item.data}</Text>
+              {item.resposta && <Text style={styles.respostaText}>{item.resposta}</Text>}
             </View>
-          )}
-  
-          {buscaPaciente.length > 2 && sugestoes.length === 0 && !selecionado && (
+          ))}
+          {historico.length > 2 && (
             <TouchableOpacity
-              style={styles.botaoCadastroSugestao}
-              onPress={() => router.push('/Rota_CadastroPessoaScreen')}
-            >
-              <MaterialIcons name="person-add" size={20} color="#fff" />
-              <Text style={styles.textoCadastro}>Cadastrar nova pessoa</Text>
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setMostrarHistoricoCompleto(!mostrarHistoricoCompleto);
+              }}>
+              <Text style={styles.verMais}>
+                {mostrarHistoricoCompleto ? 'Ver menos' : 'Ver mais'}
+              </Text>
             </TouchableOpacity>
           )}
-  
-          <TextInput
-            style={[styles.input, styles.novaQueixa]}
-            placeholder="Insira o motivo da sua visita hoje..."
-            multiline
-            value={novaQueixa}
-            onChangeText={setNovaQueixa}
-          />
-  
-          <View style={styles.historicoContainer}>
-            <Text style={styles.subTitle}>Histórico</Text>
-            {(mostrarHistoricoCompleto ? historico : historico.slice(0, 2)).map((item) => (
-              <View key={item.id} style={styles.historicoItem}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <MaterialIcons name="history" size={18} color="#999" style={{ marginRight: 8 }} />
-                  <Text style={styles.historicoText}>{item.queixa}</Text>
-                </View>
-                <Text style={styles.historicoData}>{item.data}</Text>
-                {item.resposta && <Text style={styles.respostaText}>{item.resposta}</Text>}
-              </View>
-            ))}
-            {historico.length > 2 && (
-              <TouchableOpacity
-                onPress={() => {
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setMostrarHistoricoCompleto(!mostrarHistoricoCompleto);
-                }}>
-                <Text style={styles.verMais}>
-                  {mostrarHistoricoCompleto ? 'Ver menos' : 'Ver mais'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-  
-          <Text style={styles.subTitle}>Sala</Text>
-          <View style={styles.salaContainer}>
-            {salas.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.salaButton, sala === item && styles.salaButtonSelected]}
-                onPress={() => setSala(item)}>
-                <Text style={[styles.salaButtonText, sala === item && styles.salaButtonTextSelected]}>
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
-      }
-      renderItem={null} // 👈 não precisa renderizar itens reais
-      ListFooterComponent={
-        <View style={[styles.buttonContainer, { paddingHorizontal: width * 0.05, marginBottom: 40 }]}>
-          <TouchableOpacity style={styles.button} onPress={handleSalvarAtendimento}>
-            <Text style={styles.buttonText}>Salvar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={() => router.back()}>
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </TouchableOpacity>
+
+        <Text style={[styles.subTitle, erros.sala && { color: '#DC5C5C' }]}>Sala *</Text>
+        <View style={[styles.salaContainer, erros.sala && styles.salaContainerErro]}>
+          {salas.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.salaButton, sala === item && styles.salaButtonSelected]}
+              onPress={() => {
+                setSala(item);
+                setErros((prev) => ({ ...prev, sala: false }));
+              }}>
+              <Text style={[styles.salaButtonText, sala === item && styles.salaButtonTextSelected]}>
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      }
-    />
+      </Animated.View>
+
+      <View style={[styles.buttonContainer, { marginBottom: 40 }]}>
+        <TouchableOpacity style={styles.button} onPress={handleSalvarAtendimento}>
+          <Text style={styles.buttonText}>Salvar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton]}
+          onPress={() => router.back()}>
+          <Text style={styles.cancelButtonText}>Cancelar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {toastVisible && (
+        <Animated.View style={[styles.toastContainer, { opacity: toastOpacity }]}>
+          <MaterialIcons name="check-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
+    </ScreenWrapper>
   );
-  
-  
 }
 
 const styles = StyleSheet.create({
@@ -400,5 +443,39 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: width * 0.045,
     color: '#DC5C5C'
+  },
+  inputErro: {
+    borderColor: '#DC5C5C',
+    borderWidth: 1.5,
+  },
+  salaContainerErro: {
+    borderWidth: 1,
+    borderColor: '#DC5C5C',
+    borderRadius: 8,
+    padding: 6,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 50,
+    left: '10%',
+    right: '10%',
+    backgroundColor: '#2e7d32', // Verde escuro elegante
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   }
 });

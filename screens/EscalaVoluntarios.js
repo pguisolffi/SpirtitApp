@@ -6,19 +6,9 @@ import {
   FlatList,
   StyleSheet,
   LayoutAnimation,
-  UIManager,
-  Dimensions,
-  Platform,
 } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
-
-const { width, height } = Dimensions.get("window");
-
-// Ativando animações no Android
-if (Platform.OS === "android") {
-  UIManager.setLayoutAnimationEnabledExperimental &&
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { width, height } from "../constants/Layout";
 
 const dadosVoluntarios = [
   {
@@ -78,6 +68,8 @@ const CustomToggle = ({ selected, onChange }) => {
     </View>
   );
 };
+
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function TelaVoluntariosEventos() {
   const [viewMode, setViewMode] = useState("voluntarios");
@@ -157,10 +149,10 @@ export default function TelaVoluntariosEventos() {
   );
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper title="Escala de Voluntários" scrollable={false}>
       <CustomToggle selected={viewMode} onChange={handleSelectChange} />
       {viewMode === "voluntarios" ? renderVoluntarios() : renderEventos()}
-    </View>
+    </ScreenWrapper>
   );
 }
 

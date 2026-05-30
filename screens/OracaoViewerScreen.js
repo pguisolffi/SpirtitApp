@@ -1,31 +1,21 @@
 // app/OracaoViewerScreen.js
 
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function OracaoViewerScreen() {
   const { titulo, texto } = useLocalSearchParams();
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      {/* Botão de Voltar */}
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={28} color="#6A5ACD" />
-      </TouchableOpacity>
-
-      {/* Título */}
-      <Text style={styles.title}>{titulo}</Text>
-
-      {/* Texto da oração */}
-      <ScrollView contentContainerStyle={styles.textContainer}>
-        <Text style={styles.texto}>{texto}</Text>
-      </ScrollView>
-    </View>
+    <ScreenWrapper title={titulo} scrollable={true}>
+      <Text style={styles.texto}>{texto}</Text>
+    </ScreenWrapper>
   );
 }
 

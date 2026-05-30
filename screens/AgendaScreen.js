@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,11 +9,14 @@ import {
   StyleSheet,
   Modal,
   Alert,
+  Animated,
+  Platform,
 } from "react-native";
 import CalendarPicker from "react-native-calendar-picker";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { auth } from "./firebaseConfig"; // Certifique-se de importar corretamente
+import { podeGerenciarModulo } from "../constants/Perfis";
 import {
   collection,
   doc,
@@ -27,8 +30,10 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
+import { width, height } from "../constants/Layout";
+import { Ionicons } from "@expo/vector-icons";
 
-const { width, height } = Dimensions.get("window");
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function Agenda() {
   const [dataSelecionada, setDataSelecionada] = useState(new Date());
@@ -46,6 +51,22 @@ export default function Agenda() {
   const [participacoes, setParticipacoes] = useState({});
   const [usuario, setUsuario] = useState(null);
   const [usuarioAutorizado, setUsuarioAutorizado] = useState(false);
+  const [errosNovo, setErrosNovo] = useState({ titulo: false, hora: false, local: false });
+  const [errosEdicao, setErrosEdicao] = useState({ titulo: false, hora: false, local: false });
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+
+  const triggerShake = () => {
+    shakeAnimation.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 10, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -10, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 5, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: -5, duration: 80, useNativeDriver: true }),
+      Animated.timing(shakeAnimation, { toValue: 0, duration: 80, useNativeDriver: true }),
+    ]).start();
+  };
 
   const dataChave = format(dataSelecionada, "yyyy-MM-dd");
 
@@ -75,14 +96,9 @@ export default function Agenda() {
   
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
-          const perfil = dados.perfil || "";
-  
-          console.log("Perfil encontrado:", perfil);
-  
-          const perfis = perfil.split(",").map((p) => p.trim().toUpperCase());
-          const isAdmin = perfis.includes("ADMINISTRADOR");
-  
-          setUsuarioAutorizado(isAdmin);
+          setUsuarioAutorizado(
+            podeGerenciarModulo(dados.perfil, dados.permissoes, "eventos")
+          );
         } else {
           console.warn("Usuário não encontrado na coleção bzmusuario");
           setUsuarioAutorizado(false);
@@ -111,7 +127,17 @@ export default function Agenda() {
 
   const salvarNovoEvento = async () => {
     const { titulo, hora, local, descricao } = novoEvento;
-    if (!titulo || !hora || !local) return;
+    const novosErros = {
+      titulo: !titulo,
+      hora: !hora,
+      local: !local,
+    };
+    setErrosNovo(novosErros);
+
+    if (!titulo || !hora || !local) {
+      triggerShake();
+      return;
+    }
 
     try {
       await addDoc(collection(db, "bzmagenda"), {
@@ -123,6 +149,7 @@ export default function Agenda() {
         usuarioCriacao: usuario.uid,
       });
       setNovoEvento({ titulo: "", hora: "", local: "", descricao: "" });
+      setErrosNovo({ titulo: false, hora: false, local: false });
       setFormVisivel(false);
     } catch (error) {
       console.error("Erro ao salvar evento:", error);
@@ -133,6 +160,7 @@ export default function Agenda() {
     setEventoSelecionado(evento);
     setModalAberta(true);
     setEditando(false);
+    setErrosEdicao({ titulo: false, hora: false, local: false });
 
     // Verificar se o usuário já está participando
     const q = query(
@@ -149,6 +177,18 @@ export default function Agenda() {
 
   const salvarEdicao = async () => {
     const { id, titulo, hora, local, descricao } = eventoSelecionado;
+    const novosErros = {
+      titulo: !titulo,
+      hora: !hora,
+      local: !local,
+    };
+    setErrosEdicao(novosErros);
+
+    if (!titulo || !hora || !local) {
+      triggerShake();
+      return;
+    }
+
     try {
       await updateDoc(doc(db, "bzmagenda", id), {
         titulo,
@@ -158,6 +198,7 @@ export default function Agenda() {
       });
       setEditando(false);
       setModalAberta(false);
+      setErrosEdicao({ titulo: false, hora: false, local: false });
     } catch (error) {
       console.error("Erro ao editar evento:", error);
     }
@@ -217,9 +258,7 @@ export default function Agenda() {
   const eventosDoDia = eventos[dataChave] || [];
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.titulo}>Agenda de Eventos</Text>
-
+    <ScreenWrapper title="Agenda de Eventos">
       <View style={styles.header}>
         <Text style={styles.subtitulo}>
           Eventos em {format(dataSelecionada, "dd 'de' MMMM", { locale: ptBR })}
@@ -227,7 +266,10 @@ export default function Agenda() {
         {usuarioAutorizado && (
           <TouchableOpacity
             style={styles.botaoNovo}
-            onPress={() => setFormVisivel(!formVisivel)}
+            onPress={() => {
+              setFormVisivel(!formVisivel);
+              setErrosNovo({ titulo: false, hora: false, local: false });
+            }}
           >
             <Text style={styles.botaoTexto}>+ Novo Evento</Text>
           </TouchableOpacity>
@@ -235,30 +277,33 @@ export default function Agenda() {
       </View>
 
       {formVisivel && (
-        <View style={styles.formulario}>
+        <Animated.View style={[styles.formulario, { transform: [{ translateX: shakeAnimation }] }]}>
           <TextInput
-            style={styles.input}
-            placeholder="Título"
+            style={[styles.input, errosNovo.titulo && styles.inputErro]}
+            placeholder="Título *"
             value={novoEvento.titulo}
-            onChangeText={(text) =>
-              setNovoEvento({ ...novoEvento, titulo: text })
-            }
+            onChangeText={(text) => {
+              setNovoEvento({ ...novoEvento, titulo: text });
+              if (text) setErrosNovo((prev) => ({ ...prev, titulo: false }));
+            }}
           />
           <TextInput
-            style={styles.input}
-            placeholder="Hora (ex: 14:00)"
+            style={[styles.input, errosNovo.hora && styles.inputErro]}
+            placeholder="Hora (ex: 14:00) *"
             value={novoEvento.hora}
-            onChangeText={(text) =>
-              setNovoEvento({ ...novoEvento, hora: text })
-            }
+            onChangeText={(text) => {
+              setNovoEvento({ ...novoEvento, hora: text });
+              if (text) setErrosNovo((prev) => ({ ...prev, hora: false }));
+            }}
           />
           <TextInput
-            style={styles.input}
-            placeholder="Local"
+            style={[styles.input, errosNovo.local && styles.inputErro]}
+            placeholder="Local *"
             value={novoEvento.local}
-            onChangeText={(text) =>
-              setNovoEvento({ ...novoEvento, local: text })
-            }
+            onChangeText={(text) => {
+              setNovoEvento({ ...novoEvento, local: text });
+              if (text) setErrosNovo((prev) => ({ ...prev, local: false }));
+            }}
           />
           <TextInput
             style={[styles.input, styles.textarea]}
@@ -276,7 +321,7 @@ export default function Agenda() {
           >
             <Text style={styles.botaoTexto}>Salvar Evento</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
 
       <CalendarPicker
@@ -301,7 +346,10 @@ export default function Agenda() {
         todayBackgroundColor="#f2f2f2"
         selectedDayColor="#4f46e5"
         selectedDayTextColor="#fff"
+        width={Math.min(width - 40, 460)}
+        scaleFactor={Platform.OS === 'web' ? 500 : 375}
       />
+
 
       <View style={styles.eventos}>
         {eventosDoDia.length === 0 ? (
@@ -324,31 +372,46 @@ export default function Agenda() {
 
       <Modal visible={modalAberta} animationType="slide" transparent>
         <View style={styles.modalFundo}>
-          <View style={styles.modalConteudo}>
+          <Animated.View style={[styles.modalConteudo, { transform: [{ translateX: shakeAnimation }] }]}>
+            <TouchableOpacity
+              style={styles.botaoFecharModal}
+              onPress={() => {
+                setModalAberta(false);
+                setErrosEdicao({ titulo: false, hora: false, local: false });
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
           {eventoSelecionado && (
   <>
     {editando ? (
       <>
         <TextInput
-          style={styles.input}
+          style={[styles.input, errosEdicao.titulo && styles.inputErro]}
+          placeholder="Título *"
           value={eventoSelecionado.titulo}
-          onChangeText={(text) =>
-            setEventoSelecionado({ ...eventoSelecionado, titulo: text })
-          }
+          onChangeText={(text) => {
+            setEventoSelecionado({ ...eventoSelecionado, titulo: text });
+            if (text) setErrosEdicao((prev) => ({ ...prev, titulo: false }));
+          }}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, errosEdicao.hora && styles.inputErro]}
+          placeholder="Hora (ex: 14:00) *"
           value={eventoSelecionado.hora}
-          onChangeText={(text) =>
-            setEventoSelecionado({ ...eventoSelecionado, hora: text })
-          }
+          onChangeText={(text) => {
+            setEventoSelecionado({ ...eventoSelecionado, hora: text });
+            if (text) setErrosEdicao((prev) => ({ ...prev, hora: false }));
+          }}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, errosEdicao.local && styles.inputErro]}
+          placeholder="Local *"
           value={eventoSelecionado.local}
-          onChangeText={(text) =>
-            setEventoSelecionado({ ...eventoSelecionado, local: text })
-          }
+          onChangeText={(text) => {
+            setEventoSelecionado({ ...eventoSelecionado, local: text });
+            if (text) setErrosEdicao((prev) => ({ ...prev, local: false }));
+          }}
         />
         <TextInput
           style={[styles.input, styles.textarea]}
@@ -431,19 +494,13 @@ export default function Agenda() {
 
       </>
     )}
-    <TouchableOpacity
-      style={[styles.botaoCancelar, { marginTop: 10 }]}
-      onPress={() => setModalAberta(false)}
-    >
-      <Text style={[styles.botaoTexto, { color: "#111" }]}>Fechar</Text>
-    </TouchableOpacity>
   </>
 )}
 
-          </View>
+          </Animated.View>
         </View>
       </Modal>
-    </ScrollView>
+    </ScreenWrapper>
   );
 }
 
@@ -467,7 +524,26 @@ const styles = StyleSheet.create({
   eventoDescricao: { marginTop: 4, fontSize: 14, color: "#374151" },
   semEvento: { color: "#6b7280", fontStyle: "italic", marginTop: 8 },
   modalFundo: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)" },
-  modalConteudo: { backgroundColor: "#fff", padding: 20, borderRadius: 10, width: "90%" },
+  modalConteudo: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    width: "90%",
+    ...(Platform.OS === 'web' && {
+      maxWidth: 450,
+    }),
+  },
+  inputErro: {
+    borderColor: "#dc2626",
+    borderWidth: 1.5,
+  },
+  botaoFecharModal: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+    padding: 4,
+  },
 });
 
  

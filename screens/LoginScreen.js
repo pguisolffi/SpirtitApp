@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Image, Alert, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
@@ -8,21 +8,55 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Animatable from 'react-native-animatable';
 import Input from '../components/input';
 import { auth } from './firebaseConfig';
 import { AntDesign } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LottieView from 'lottie-react-native'; // << Adicionado aqui
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
 WebBrowser.maybeCompleteAuthSession();
+
+import ScreenWrapper from '../components/ScreenWrapper';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false); // << Novo estado para controlar animação
+
+  const fadeAnimImage = useRef(new Animated.Value(0)).current;
+  const fadeAnimForm = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnimImage, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnimForm, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      fadeAnimImage.setValue(0);
+      fadeAnimForm.setValue(0);
+    }
+  }, [loading]);
+
+  const translateYImage = fadeAnimImage.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-50, 0],
+  });
+
+  const translateYForm = fadeAnimForm.interpolate({
+    inputRange: [0, 1],
+    outputRange: [50, 0],
+  });
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     expoClientId: 'SEUS_CLIENT_IDS_AQUI',
@@ -74,14 +108,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <ScreenWrapper showHeader={false} scrollable={false}>
       <LinearGradient colors={['#e0f7fa', '#ffffff']} style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           {!loading && (
-            <Animatable.Image
-              animation="fadeInDown"
+            <Animated.Image
               source={require('../assets/logo.png')}
-              style={styles.logo}
+              style={[
+                styles.logo,
+                {
+                  opacity: fadeAnimImage,
+                  transform: [{ translateY: translateYImage }],
+                },
+              ]}
               resizeMode="contain"
             />
           )} 
@@ -101,7 +140,15 @@ export default function LoginScreen() {
           )}
 
           {!loading && (
-            <Animatable.View animation="fadeInUp" style={styles.formBox}>
+            <Animated.View
+              style={[
+                styles.formBox,
+                {
+                  opacity: fadeAnimForm,
+                  transform: [{ translateY: translateYForm }],
+                },
+              ]}
+            >
               <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
               <Input placeholder="Senha" secureTextEntry value={senha} onChangeText={setSenha} />
 
@@ -122,14 +169,14 @@ export default function LoginScreen() {
               <TouchableOpacity onPress={() => router.push('/Rota_RecuperarSenhaScreen')}>
                 <Text style={styles.forgot}>Esqueceu a senha?</Text>
               </TouchableOpacity>
-            </Animatable.View>
+            </Animated.View>
           )}
           {!loading && (
           <Text style={styles.footer}>© 2025 - Fraternidade Bezerra de Menezes</Text>
           )}
         </ScrollView>
       </LinearGradient>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
@@ -144,10 +191,26 @@ const styles = StyleSheet.create({
     height: width * 0.8,
     marginBottom: 20,
     paddingTop: height * 0.45,
+    ...(Platform.OS === 'web' && {
+      maxWidth: 240,
+      maxHeight: 240,
+    }),
   },
   formBox: {
     width: '100%',
     paddingHorizontal: 10,
+    ...(Platform.OS === 'web' && {
+      maxWidth: 420,
+      backgroundColor: '#ffffff',
+      borderRadius: 16,
+      padding: 32,
+      shadowColor: '#0f172a',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.05,
+      shadowRadius: 20,
+      elevation: 5,
+      marginTop: 20,
+    }),
   },
   loginBtn: {
     backgroundColor: '#007AFF',
@@ -207,11 +270,8 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   loadingOverlay: {
-    position: 'absolute',
-    top: '30%',
-    left: 0,
-    right: 0,
     alignItems: 'center',
-    zIndex: 999,
+    justifyContent: 'center',
+    padding: 24,
   },
 });

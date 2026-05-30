@@ -6,16 +6,17 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Dimensions,
   Alert,
 } from 'react-native';
-import { getAuth } from 'firebase/auth';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { auth, db } from './firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
+import ScreenWrapper from '../components/ScreenWrapper';
+import PerfilPermissoesEditor from '../components/PerfilPermissoesEditor';
+import { ehAdministrador, rotuloPerfil } from '../constants/Perfis';
 
 export default function ContaScreen() {
   const router = useRouter();
@@ -28,7 +29,6 @@ export default function ContaScreen() {
 
   useEffect(() => {
     const carregarDados = async () => {
-      const auth = getAuth();
       const user = auth.currentUser;
 
       if (user) {
@@ -39,7 +39,7 @@ export default function ContaScreen() {
           const docData = snapshot.docs[0].data();
           setUsuario(docData);
           setIdDocUsuario(snapshot.docs[0].id); // salva o id do documento para o update
-          setIsAdmin(docData.perfil === 'Administrador');
+          setIsAdmin(ehAdministrador(docData.perfil));
         } else {
           console.error('Usuário não encontrado no Firestore.');
         }
@@ -104,13 +104,7 @@ export default function ContaScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={28} color="#333" />
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Minha Conta</Text>
-
+    <ScreenWrapper title="Minha Conta">
       <View style={styles.card}>
         <Text style={styles.label}>Nome completo:</Text>
         <TextInput
@@ -174,28 +168,26 @@ export default function ContaScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Perfil e Permissões</Text>
 
-        <Text style={styles.label}>Perfil:</Text>
-        <TextInput
-          style={styles.input}
-          value={usuario.perfil}
-          editable={isAdmin}
-          onChangeText={(text) => setUsuario({ ...usuario, perfil: text })}
-        />
+        {!isAdmin ? (
+          <Text style={styles.perfilSomenteLeituraHint}>
+            Seu perfil: {rotuloPerfil(usuario.perfil)}. Alterações só podem ser feitas por um administrador.
+          </Text>
+        ) : null}
 
-        <Text style={styles.label}>Permissões:</Text>
-        <TextInput
-          style={styles.input}
-          value={Array.isArray(usuario.permissoes) ? usuario.permissoes.join(', ') : usuario.permissoes}
+        <PerfilPermissoesEditor
+          perfil={usuario.perfil}
+          permissoes={usuario.permissoes}
           editable={isAdmin}
-          onChangeText={(text) => setUsuario({ ...usuario, permissoes: text.split(',').map(p => p.trim()) })}
-          placeholder="Ex: atendimento, eventos"
+          onChange={({ perfil, permissoes }) =>
+            setUsuario({ ...usuario, perfil, permissoes })
+          }
         />
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSalvar}>
         <Text style={styles.saveButtonText}>Salvar Alterações</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </ScreenWrapper>
   );
 }
 
@@ -265,5 +257,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 12,
   },
- 
+  perfilSomenteLeituraHint: {
+    fontSize: 13,
+    color: '#777',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
 });

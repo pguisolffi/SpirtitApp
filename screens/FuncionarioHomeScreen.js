@@ -4,19 +4,20 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Image,
   FlatList,
   Animated,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAuth,signOut  } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { auth, db } from './firebaseConfig';
 import dev from '../gambiarrasTemporarias/dev';
 import { useRouter } from 'expo-router';
-
-const { width, height } = Dimensions.get('window');
+import { width, height } from '../constants/Layout';
+import { APP_NOME, APP_TITULO_PAINEL } from '../constants/AppBranding';
 
 const menuItems = [
   { label: 'Novo Atendimento', icon: 'person-add-outline', route: '/Rota_NovoAtendimento' },
@@ -37,7 +38,11 @@ const drawerItems = [
 ];
 
 
+import ScreenWrapper from '../components/ScreenWrapper';
+
 export default function HomeFuncionario() {
+  const { width: winWidth } = useWindowDimensions();
+  const isWebDesktop = Platform.OS === 'web' && winWidth > 768;
   const [primeiroNome, setPrimeiroNome] = useState('Amigo');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerAnimation = useState(new Animated.Value(-width * 0.6))[0];
@@ -45,7 +50,6 @@ export default function HomeFuncionario() {
 
   useEffect(() => {
     const buscarNomeDoUsuario = async () => {
-      const auth = getAuth();
       const email = auth.currentUser?.email;
 
       if (!email) return;
@@ -112,7 +116,6 @@ export default function HomeFuncionario() {
   
     if (action === 'sair') {
       try {
-        const auth = getAuth();
         await signOut(auth);
         router.replace('/login'); // Volta para o login
       } catch (error) {
@@ -129,62 +132,63 @@ export default function HomeFuncionario() {
   
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper title={APP_TITULO_PAINEL} showBackButton={false} scrollable={false}>
       {/* Botão de abrir Drawer */}
-      <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
-        <Ionicons name="menu" size={28} color="#333" />
-      </TouchableOpacity>
+      {!isWebDesktop && (
+        <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
+          <Ionicons name="menu" size={28} color="#333" />
+        </TouchableOpacity>
+      )}
   
       {/* Drawer lateral */}
-      {drawerOpen && (
+      {!isWebDesktop && drawerOpen && (
         <TouchableOpacity style={styles.overlay} onPress={closeDrawer} activeOpacity={1}>
-  <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
-    
+          <Animated.View style={[styles.drawer, { transform: [{ translateX: drawerAnimation }] }]}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../assets/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <Text style={styles.drawerBrandTitle} numberOfLines={3}>
+                {APP_NOME}
+              </Text>
+            </View>
 
-    <View style={styles.logoContainer}>
-      <Image
-        source={require('../assets/logo.png')}  // ajuste o caminho da sua logo
-        style={styles.logo}
-        resizeMode="contain"
-      />
-    </View>
-
-    {/* 🔥 MENUS ABAIXO */}
-    {drawerItems.map((item, index) => (
-  <TouchableOpacity
-    key={index}
-    style={styles.drawerItemContainer}
-    onPress={() => handleDrawerItemPress(item.action)}
-    activeOpacity={0.7}
-  >
-    <View style={styles.drawerItem}>
-      <View style={styles.iconCircle}>
-        <Ionicons name={item.icon} size={20} color="#6A5ACD" />
-      </View>
-      <Text style={styles.drawerText}>{item.label}</Text>
-    </View>
-  </TouchableOpacity>
-))}
-
-  </Animated.View>
-</TouchableOpacity>
-
+            {/* 🔥 MENUS ABAIXO */}
+            {drawerItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.drawerItemContainer}
+                onPress={() => handleDrawerItemPress(item.action)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.drawerItem}>
+                  <View style={styles.iconCircle}>
+                    <Ionicons name={item.icon} size={20} color="#6A5ACD" />
+                  </View>
+                  <Text style={styles.drawerText}>{item.label}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+        </TouchableOpacity>
       )}
   
       {/* Conteúdo da Home */}
       <Text style={styles.title}>👋 Olá, {primeiroNome}!</Text>
       <Text style={styles.subtitle}>Tenha um excelente dia de trabalho 🙏</Text>
       <FlatList
+        key={isWebDesktop ? 'web-grid' : 'mobile-grid'}
         data={menuItems}
         keyExtractor={(item) => item.label}
-        numColumns={2}
+        numColumns={isWebDesktop ? 4 : 2}
         renderItem={renderItem}
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
       />
-    </View>
+    </ScreenWrapper>
   );
-  
 }
 
 const styles = StyleSheet.create({
@@ -215,16 +219,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     zIndex: 30,
-  },
-  drawerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  drawerText: {
-    fontSize: 18,
-    marginLeft: 10,
-    color: '#333',
   },
   title: {
     fontSize: width * 0.06,
@@ -267,12 +261,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   logoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: height * 0.03,
+    paddingRight: 8,
   },
   logo: {
-    width: width * 0.4,
-    height: width * 0.4,
+    width: width * 0.22,
+    height: width * 0.22,
+    marginRight: 10,
+  },
+  drawerBrandTitle: {
+    flex: 1,
+    fontSize: width * 0.038,
+    fontWeight: '700',
+    color: '#333',
+    lineHeight: width * 0.05,
   },
   drawerItemContainer: {
     backgroundColor: '#f5f5f5',

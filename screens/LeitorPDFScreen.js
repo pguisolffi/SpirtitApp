@@ -1,35 +1,31 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { width, height } from '../constants/Layout';
+import ScreenWrapper from '../components/ScreenWrapper';
 
-const { width, height } = Dimensions.get('window');
+// Only import WebView on native — importing it on web causes a crash
+let WebView;
+if (Platform.OS !== 'web') {
+  WebView = require('react-native-webview').WebView;
+}
 
 export default function LeitorPDFScreen() {
   const { titulo, pdfUrl } = useLocalSearchParams();
-  const idPessoa = '1744840882517';
   const [finalUrl, setFinalUrl] = useState('');
   const [carregando, setCarregando] = useState(true);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const prepararLeitura = async () => {
-      try {
-        const gviewUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`;
-        setFinalUrl(gviewUrl);
-      } catch (e) {
-        console.log('Erro ao preparar leitura:', e);
-      }
-    };
-
-    prepararLeitura();
-  }, []);
+    if (pdfUrl) {
+      const gviewUrl = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(pdfUrl)}`;
+      setFinalUrl(gviewUrl);
+    }
+  }, [pdfUrl]);
 
   useEffect(() => {
-    Animated.loop(
+    const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(scaleAnim, {
           toValue: 1.2,
@@ -44,15 +40,13 @@ export default function LeitorPDFScreen() {
           easing: Easing.inOut(Easing.ease),
         }),
       ])
-    ).start();
-  }, []);
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [scaleAnim]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.titulo}>{titulo}</Text>
-      </View>
-
+    <ScreenWrapper title={titulo || 'Leitor de PDF'} scrollable={false}>
       {carregando && (
         <View style={styles.loaderOverlay}>
           <Animated.Text style={[styles.icone, { transform: [{ scale: scaleAnim }] }]}>📖</Animated.Text>
@@ -60,28 +54,28 @@ export default function LeitorPDFScreen() {
         </View>
       )}
 
-      <WebView
-        source={{ uri: finalUrl }}
-        style={[styles.pdf, { opacity: carregando ? 0 : 1 }]}
-        onLoadEnd={() => setCarregando(false)}
-      />
-    </View>
+      {finalUrl ? (
+        Platform.OS === 'web' ? (
+          <iframe
+            src={finalUrl}
+            style={styles.iframe}
+            onLoad={() => setCarregando(false)}
+            title={titulo || 'PDF'}
+            frameBorder="0"
+          />
+        ) : (
+          <WebView
+            source={{ uri: finalUrl }}
+            style={[styles.pdf, { opacity: carregando ? 0 : 1 }]}
+            onLoadEnd={() => setCarregando(false)}
+          />
+        )
+      ) : null}
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  topBar: {
-    paddingVertical: height * 0.015,
-    paddingHorizontal: width * 0.04,
-    backgroundColor: '#f2f2f2',
-    alignItems: 'center',
-  },
-  titulo: {
-    fontSize: width * 0.045,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   loaderOverlay: {
     position: 'absolute',
     top: 0,
@@ -103,7 +97,12 @@ const styles = StyleSheet.create({
   },
   pdf: {
     flex: 1,
-    width: width,
-    height: height,
+    width: '100%',
+  },
+  iframe: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    border: 'none',
   },
 });

@@ -8,16 +8,18 @@ import {
   TextInput,
   Modal,
   StyleSheet,
-  Dimensions,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
-import { collection,query,where, getDocs, addDoc, deleteDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection,query,where, getDocs, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig'; // Agora importa o auth também
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { width, height } from '../constants/Layout';
 
-const { width, height } = Dimensions.get('window');
+import ScreenWrapper from '../components/ScreenWrapper';
+import { podeGerenciarModulo } from '../constants/Perfis';
+import { WebView } from 'react-native-webview';
 
 export default function CursosPalestrasScreen() {
   const [cursos, setCursos] = useState([]);
@@ -29,7 +31,15 @@ export default function CursosPalestrasScreen() {
   const [novaDescricao, setNovaDescricao] = useState('');
   const [editandoId, setEditandoId] = useState(null);
   const [perfilUsuario, setPerfilUsuario] = useState('');
-  const router = useRouter();
+  const [permissoesUsuario, setPermissoesUsuario] = useState([]);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState(null);
+
+  const podeAdministrar = podeGerenciarModulo(
+    perfilUsuario,
+    permissoesUsuario,
+    'cursos'
+  );
 
   useEffect(() => {
     carregarCursos();
@@ -59,6 +69,7 @@ export default function CursosPalestrasScreen() {
         if (!querySnapshot.empty) {
           const dados = querySnapshot.docs[0].data();
           setPerfilUsuario(dados.perfil);
+          setPermissoesUsuario(dados.permissoes);
         } else {
           console.log('Usuário não encontrado no Firestore');
         }
@@ -77,7 +88,8 @@ export default function CursosPalestrasScreen() {
   const abrirVideo = (curso) => {
     const videoId = extrairVideoId(curso.urlyoutube);
     if (videoId) {
-      router.push({ pathname: '/Rota_VideoViewerScreen', params: { videoId } });
+      setSelectedVideoId(videoId);
+      setVideoModalVisible(true);
     } else {
       alert('Vídeo inválido.');
     }
@@ -85,7 +97,7 @@ export default function CursosPalestrasScreen() {
 
   const adicionarOuEditarCurso = async () => {
     if (!novoTitulo.trim() || !novoUrl.trim()) {
-      alert('Preencha o título e a URL.');
+      alert('Preencha o título e o URL.');
       return;
     }
 
@@ -119,7 +131,7 @@ export default function CursosPalestrasScreen() {
   };
 
   const abrirMenuOpcoes = (item) => {
-    if (perfilUsuario !== 'admin') return; 
+    if (!podeAdministrar) return; 
 
     Alert.alert(
       'Opções',
@@ -165,9 +177,7 @@ export default function CursosPalestrasScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🎬 Cursos e Palestras</Text>
-
+    <ScreenWrapper title="Cursos e Palestras" scrollable={false}>
       <TextInput
         style={styles.inputFiltro}
         placeholder="Buscar cursos..."
@@ -202,7 +212,7 @@ export default function CursosPalestrasScreen() {
       />
 
       {/* Botão flutuante apenas para admins */}
-      {perfilUsuario === 'admin' && (
+      {podeAdministrar && (
         <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
           <Ionicons name="add" size={32} color="#fff" />
         </TouchableOpacity>
@@ -217,6 +227,19 @@ export default function CursosPalestrasScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.botaoFecharModal}
+              onPress={() => {
+                setModalVisible(false);
+                setEditandoId(null);
+                setNovoTitulo('');
+                setNovoUrl('');
+                setNovaDescricao('');
+              }}
+            >
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+
             <Text style={styles.modalTitle}>
               {editandoId ? 'Editar Vídeo' : 'Adicionar Novo Vídeo'}
             </Text>
@@ -247,24 +270,57 @@ export default function CursosPalestrasScreen() {
                   {editandoId ? 'Atualizar' : 'Salvar'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: '#ccc' }]}
-                onPress={() => {
-                  setModalVisible(false);
-                  setEditandoId(null);
-                  setNovoTitulo('');
-                  setNovoUrl('');
-                  setNovaDescricao('');
-                }}
-              >
-                <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
-              </TouchableOpacity>
             </View>
 
           </View>
         </View>
       </Modal>
-    </View>
+
+      {/* Modal para Visualizar Vídeo Embarcado */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={videoModalVisible}
+        onRequestClose={() => {
+          setVideoModalVisible(false);
+          setSelectedVideoId(null);
+        }}
+      >
+        <View style={styles.videoModalContainer}>
+          <View style={styles.videoModalContent}>
+            <TouchableOpacity
+              style={styles.botaoFecharVideoModal}
+              onPress={() => {
+                setVideoModalVisible(false);
+                setSelectedVideoId(null);
+              }}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+
+            {selectedVideoId && (
+              <View style={styles.videoPlayerContainer}>
+                {Platform.OS === 'web' ? (
+                  <iframe
+                    src={`https://www.youtube.com/embed/${selectedVideoId}`}
+                    style={styles.videoIframe}
+                    allowFullScreen
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    title="YouTube Video"
+                  />
+                ) : (
+                  <WebView
+                    source={{ uri: `https://www.youtube.com/embed/${selectedVideoId}` }}
+                    style={styles.videoWebview}
+                    allowsFullscreenVideo
+                  />
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </ScreenWrapper>
   );
 }
 
@@ -278,10 +334,66 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, fontWeight: 'bold', padding: 8, textAlign: 'center', color: '#333' },
   fab: { position: 'absolute', bottom: 20, right: 20, backgroundColor: '#6A5ACD', borderRadius: 30, padding: 15, elevation: 5 },
   modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { backgroundColor: '#fff', padding: 20, borderRadius: 12, width: '85%' },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    width: '85%',
+    ...(Platform.OS === 'web' && {
+      maxWidth: 450,
+    }),
+  },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
   modalInput: { backgroundColor: '#f1f1f1', borderRadius: 8, padding: 10, marginBottom: 10 },
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   modalButton: { flex: 1, backgroundColor: '#6A5ACD', borderRadius: 8, padding: 10, marginHorizontal: 5, alignItems: 'center' },
   modalButtonText: { color: '#fff', fontWeight: 'bold' },
+  botaoFecharModal: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 20,
+    padding: 4,
+  },
+  videoModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  videoModalContent: {
+    width: '100%',
+    maxWidth: 900,
+    aspectRatio: 16 / 9,
+    position: 'relative',
+  },
+  botaoFecharVideoModal: {
+    position: 'absolute',
+    top: -45,
+    right: 0,
+    zIndex: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    padding: 5,
+  },
+  videoPlayerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  videoWebview: {
+    flex: 1,
+  },
+  videoIframe: {
+    width: '100%',
+    height: '100%',
+    border: 'none',
+  },
 });
